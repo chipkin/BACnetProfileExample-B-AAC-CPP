@@ -91,8 +91,9 @@ There are no unit tests; verification is behavioural:
 6. **Device management**: ReinitializeDevice WARMSTART SimpleACKs; DCC
    `disable-initiation`/`enable` SimpleACK; a wrong password (if set) is rejected.
 
-A raw-socket regression script lives outside the repo at `../_baac_test.py`
-(run the device on a clear `--port` first - the SO_REUSEADDR gotcha).
+Verification is manual (no in-repo test suite ships). During development a
+raw-socket smoke script was used against a running instance on a clear `--port`
+(mind the SO_REUSEADDR gotcha - kill stale instances first).
 
 ## Releasing
 

@@ -46,7 +46,7 @@ and events** and **schedule** local actions. (New to BACnet? See Chipkin's
 | DeviceCommunicationControl | DM-DCC-B | ✅ |
 | ReinitializeDevice | DM-RD-B | ✅ (cold/warm start) |
 | Time synchronisation | DM-TS-B / DM-UTC-B | ✅ |
-| Who-Is/I-Am, Who-Has/I-Have | DM-DDB-B, DM-DOB-B | ✅ |
+| Who-Is/I-Am (answer + initiate), Who-Has/I-Have | DM-DDB-A,B, DM-DOB-B | ✅ |
 
 ## Intrinsic alarming (the headline B-AAC capability)
 

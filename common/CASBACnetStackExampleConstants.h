@@ -67,6 +67,7 @@ static const uint32_t PROPERTY_IDENTIFIER_VENDOR_NAME = 121;
 // -- BACnet engineering units (Engineering_Units enumeration) ---------------
 //    Full list: submodules/cas-bacnet-stack/source/BACnetEngineeringUnits.h
 static const uint32_t ENGINEERING_UNITS_DEGREES_CELSIUS = 62;
+static const uint32_t ENGINEERING_UNITS_PERCENT = 98;
 
 // -- BACnet polarity (Polarity enumeration, for Binary objects) -------------
 //    Full list: submodules/cas-bacnet-stack/source/BACnetPolarity.h
@@ -107,6 +108,7 @@ static const uint8_t NOTIFY_TYPE_EVENT = 1;
 //    out-parameter and returns false to reject the request with that Error-PDU.
 static const uint32_t ERROR_CODE_VALUE_OUT_OF_RANGE = 37;
 static const uint32_t ERROR_CODE_PASSWORD_FAILURE = 26;
+static const uint32_t ERROR_CODE_OPTIONAL_FUNCTIONALITY_NOT_SUPPORTED = 45;
 
 // -- DeviceCommunicationControl enable-disable argument ----------------------
 //    Full list: submodules/cas-bacnet-stack/source/BACnetEnableDisable.h
