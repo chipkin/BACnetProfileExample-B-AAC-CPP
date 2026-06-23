@@ -8,6 +8,11 @@ They are revisited as the stack gains the capability.
 See the README's "What this example does NOT do yet" section for the user-facing
 summary; this file is the engineering detail.
 
+> **Tracking CAS BACnet Stack v6.x.x.** This example now builds against the
+> actively-developed v6 stack. Several gaps below depend on stack capabilities that
+> are evolving in v6; each will be wired up here as the corresponding API lands.
+> Nothing below is claimed to work yet - the items are still open.
+
 ## 1. SCHED-I-B - internal scheduling (Schedule + Calendar objects)
 
 **Status: not implemented.** B-AAC requires SCHED-I-B: the device runs a

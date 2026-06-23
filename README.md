@@ -9,8 +9,9 @@ alarms** (EventNotifications when a value goes out of range), accepts
 **AcknowledgeAlarm** and **GetEventInformation**, synchronises its clock, and
 handles **DeviceCommunicationControl** and **ReinitializeDevice**.
 
-> **Versions:** this document describes **example v1.0.0**, built and verified
-> against **CAS BACnet Stack 5.4.2.0** at **Protocol_Revision 24**.
+> **Versions:** this document describes **example v1.0.0**, built against
+> **CAS BACnet Stack v6.x.x** (under active development; the exact build number
+> prints at start-up) at **Protocol_Revision 24**.
 
 > **B-AAC is not fully claimable with the standard stack yet.** This example
 > implements every B-AAC capability the standard CAS BACnet Stack DLL exposes, and
@@ -60,8 +61,10 @@ stack runs, with no external Event Enrollment. This example arms **Analog Value 
 Try it: `WriteProperty` Diamond's `Present_Value` to `95` - the device prints the
 write, `Event_State` becomes `high-limit`, and an `UnconfirmedEventNotification`
 goes out to the recipient. Write it back to `50` and it returns to `NORMAL` (a
-second notification). By default the recipient is the **local subnet broadcast**
-(so any client sees the alarm); point it at a specific client in `main.cpp`.
+second notification). You can also do this **from the keyboard**: press `e`, select
+Diamond, and step it up past `90` (or down past `10`). By default the recipient is
+the **local subnet broadcast** (so any client sees the alarm); point it at a
+specific client in `main.cpp`.
 
 ## The device this example creates
 
@@ -121,7 +124,30 @@ cmake --build build --config Release
 The first build compiles the whole CAS BACnet Stack (~460 files) and takes a few
 minutes; later builds are fast. Use `-D CAS_STACK_DIR=/path` to point at a stack
 elsewhere. Options: `--port <n>` (default 47808), `--deviceID <n>` (default 389001).
-Interactive keys: `h` help, `q` quit, up/down nudge Analog Input 1.
+
+**Interactive commands** (the shared "edit mode" UI, in `common/`):
+
+| Key | Action |
+|-----|--------|
+| `h` | Show the version information and this command list. |
+| `q` | Quit. |
+| `e` | Enter **edit mode** to change an object's live value. |
+
+In edit mode, press a number to select an object, then **up/down** to change it,
+**space** to toggle a binary input / step a multi-state, and **esc** to exit:
+
+| In edit mode | Object | Effect |
+|--------------|--------|--------|
+| `1`, then up/down | Analog Input 1 (`Bronze`) | raise / lower the temperature |
+| `2`, then up/down/space | Binary Input 1 (`Emerald`) | turn active / inactive |
+| `3`, then up/down/space | Multi-State Input 1 (`Hot Pink`) | step through the states |
+| `4`, then up/down | Analog Value 1 (`Diamond`) | drive it past its low (`10`) / high (`90`) limit |
+
+Editing **Diamond** past a limit re-runs its intrinsic OutOfRange algorithm and
+fires the alarm - so you can stimulate the EventNotification straight from the
+keyboard, without a separate BACnet client. The commandable outputs are not
+editable from the keyboard; drive them with `WriteProperty` (they resolve from
+their Priority_Array).
 
 ## Verify
 
