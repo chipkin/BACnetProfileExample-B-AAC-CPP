@@ -1,4 +1,4 @@
-# BACnet B-AAC (Advanced Application Controller) - C++ example
+﻿# BACnet B-AAC (Advanced Application Controller) - C++ example
 
 A tutorial example showing how to implement **as much of the BACnet B-AAC
 (Advanced Application Controller)** device profile as the
@@ -34,19 +34,19 @@ and events** and **schedule** local actions. (New to BACnet? See Chipkin's
 
 | Requirement | BIBB | This example |
 |---|---|:--:|
-| ReadProperty | DS-RP-B | ✅ |
-| ReadPropertyMultiple | DS-RPM-B | ✅ |
-| WriteProperty | DS-WP-B | ✅ |
-| WritePropertyMultiple | DS-WPM-B | ✅ |
-| Generate event notifications | AE-N-I-B | ✅ (intrinsic OutOfRange) |
-| Accept AcknowledgeAlarm | AE-ACK-B | ✅ |
-| Answer GetEventInformation | AE-INFO-B | ✅ |
-| Configurable recipient list | AE-CRL-B | ⚠️ partial (seeded, not writable) |
-| Internal scheduling | SCHED-I-B | ❌ not yet ([TODO.md](TODO.md)) |
-| DeviceCommunicationControl | DM-DCC-B | ✅ |
-| ReinitializeDevice | DM-RD-B | ✅ (cold/warm start) |
-| Time synchronisation | DM-TS-B / DM-UTC-B | ✅ |
-| Who-Is/I-Am (answer + initiate), Who-Has/I-Have | DM-DDB-A,B, DM-DOB-B | ✅ |
+| ReadProperty | DS-RP-B | âœ… |
+| ReadPropertyMultiple | DS-RPM-B | âœ… |
+| WriteProperty | DS-WP-B | âœ… |
+| WritePropertyMultiple | DS-WPM-B | âœ… |
+| Generate event notifications | AE-N-I-B | âœ… (intrinsic OutOfRange) |
+| Accept AcknowledgeAlarm | AE-ACK-B | âœ… |
+| Answer GetEventInformation | AE-INFO-B | âœ… |
+| Configurable recipient list | AE-CRL-B | âš ï¸ partial (seeded, not writable) |
+| Internal scheduling | SCHED-I-B | âŒ not yet ([TODO.md](TODO.md)) |
+| DeviceCommunicationControl | DM-DCC-B | âœ… |
+| ReinitializeDevice | DM-RD-B | âœ… (cold/warm start) |
+| Time synchronisation | DM-TS-B / DM-UTC-B | âœ… |
+| Who-Is/I-Am (answer + initiate), Who-Has/I-Have | DM-DDB-A,B, DM-DOB-B | âœ… |
 
 ## Intrinsic alarming (the headline B-AAC capability)
 
@@ -66,16 +66,16 @@ second notification). By default the recipient is the **local subnet broadcast**
 ## The device this example creates
 
 ```
-Device 389001  "Rainbow"   (Vendor 389 - Chipkin Automation Systems)
-    ├── Analog Input  1       "Bronze"      read-only sensor (REAL, deg C)
-    ├── Binary Input  1       "Emerald"     read-only sensor (active/inactive)
-    ├── Multi-State Input 1   "Hot Pink"    read-only sensor (state 1..3)
-    ├── Analog Output 1       "Chartreuse"  writable, commandable (REAL)
-    ├── Binary Output 1       "Fuchsia"     writable, commandable (0/1)
-    ├── Multi-State Output 1  "Indigo"      writable, commandable (state 1..3)
-    ├── Analog Value 1        "Diamond"     writable; intrinsic OutOfRange ALARM
-    ├── Notification Class 1  "Jade"        routes Diamond's alarms to recipients
-    └── Network Port 1        "Vermilion"   the BACnet/IP port (required)
+Device 389004  "Rainbow"   (Vendor 389 - Chipkin Automation Systems)
+    â”œâ”€â”€ Analog Input  1       "Bronze"      read-only sensor (REAL, deg C)
+    â”œâ”€â”€ Binary Input  1       "Emerald"     read-only sensor (active/inactive)
+    â”œâ”€â”€ Multi-State Input 1   "Hot Pink"    read-only sensor (state 1..3)
+    â”œâ”€â”€ Analog Output 1       "Chartreuse"  writable, commandable (REAL)
+    â”œâ”€â”€ Binary Output 1       "Fuchsia"     writable, commandable (0/1)
+    â”œâ”€â”€ Multi-State Output 1  "Indigo"      writable, commandable (state 1..3)
+    â”œâ”€â”€ Analog Value 1        "Diamond"     writable; intrinsic OutOfRange ALARM
+    â”œâ”€â”€ Notification Class 1  "Jade"        routes Diamond's alarms to recipients
+    â””â”€â”€ Network Port 1        "Vermilion"   the BACnet/IP port (required)
 ```
 
 The three inputs are the series' shared minimum; the outputs come from B-SA/B-ASC;
@@ -120,7 +120,7 @@ cmake --build build --config Release
 
 The first build compiles the whole CAS BACnet Stack (~460 files) and takes a few
 minutes; later builds are fast. Use `-D CAS_STACK_DIR=/path` to point at a stack
-elsewhere. Options: `--port <n>` (default 47808), `--deviceID <n>` (default 389001).
+elsewhere. Options: `--port <n>` (default 47808), `--deviceID <n>` (default 389004).
 Interactive keys: `h` help, `q` quit, up/down nudge Analog Input 1.
 
 ## Verify
@@ -128,7 +128,7 @@ Interactive keys: `h` help, `q` quit, up/down nudge Analog Input 1.
 With the [CAS BACnet Explorer](https://store.chipkin.com/products/tools/cas-bacnet-explorer)
 (or any client):
 
-1. **Discover** - Who-Is -> I-Am from `389001` (vendor `389`).
+1. **Discover** - Who-Is -> I-Am from `389004` (vendor `389`).
 2. **Object model** - nine objects incl. Analog Value "Diamond" and Notification
    Class "Jade". `Object_List` lists them all; `Protocol_Revision` = 24.
 3. **ReadPropertyMultiple** - read several properties of "Diamond" in one request
