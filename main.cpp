@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: CC0-1.0
+// SPDX-License-Identifier: CC0-1.0
 // Public-domain example code (CC0) - see LICENSE. The CAS BACnet Stack itself is
 // a separate, commercially licensed product and is not covered by CC0.
 // =============================================================================
@@ -957,6 +957,11 @@ int main(int argc, char** argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
 
     // --- Command line + version --------------------------------------------
+    // --help / --version print and exit, so handle them before we bind a socket
+    // or touch the stack.
+    if (CASExampleHelper::HandleHelpAndVersionArgs(argc, argv, APP_NAME, APP_VERSION)) {
+        return 0;
+    }
     const uint16_t port = CASExampleHelper::ParsePortArg(argc, argv, 47808);
     g_deviceInstance = CASExampleHelper::ParseDeviceIdArg(argc, argv, g_deviceInstance);
     CASExampleHelper::PrintVersion(APP_NAME, APP_VERSION);
@@ -1084,8 +1089,11 @@ int main(int argc, char** argv) {
     // already enabled; our Get* callbacks just supply their values. Only
     // OPTIONAL properties need SetPropertyEnabled. State_Text is optional on a
     // Multi-State Input, so we enable it here (and serve it in GetPropertyCharString).
-    BACnetStack_SetPropertyEnabled(g_deviceInstance, OBJECT_TYPE_MULTI_STATE_INPUT,
-                                   MULTI_STATE_INPUT_INSTANCE, PROPERTY_IDENTIFIER_STATE_TEXT, true);
+    if (!BACnetStack_SetPropertyEnabled(g_deviceInstance, OBJECT_TYPE_MULTI_STATE_INPUT,
+                                        MULTI_STATE_INPUT_INSTANCE, PROPERTY_IDENTIFIER_STATE_TEXT, true)) {
+        printf("Error: Failed to enable State_Text on Multi-State Input 1 (Hot Pink).\n");
+        return 1;
+    }
 
     // --- Make the output objects commandable --------------------------------
     // A commandable object's Present_Value is resolved from a 16-slot
@@ -1100,19 +1108,25 @@ int main(int argc, char** argv) {
         OBJECT_TYPE_ANALOG_OUTPUT, OBJECT_TYPE_BINARY_OUTPUT, OBJECT_TYPE_MULTI_STATE_OUTPUT
     };
     for (size_t i = 0; i < sizeof(outputTypes) / sizeof(outputTypes[0]); ++i) {
-        BACnetStack_SetPropertyEnabled(g_deviceInstance, outputTypes[i], 1,
-                                       PROPERTY_IDENTIFIER_PRIORITY_ARRAY, true);
-        BACnetStack_SetPropertyEnabled(g_deviceInstance, outputTypes[i], 1,
-                                       PROPERTY_IDENTIFIER_RELINQUISH_DEFAULT, true);
-        BACnetStack_SetPropertyWritable(g_deviceInstance, outputTypes[i], 1,
-                                        PROPERTY_IDENTIFIER_PRESENT_VALUE, true);
+        if (!BACnetStack_SetPropertyEnabled(g_deviceInstance, outputTypes[i], 1,
+                                            PROPERTY_IDENTIFIER_PRIORITY_ARRAY, true) ||
+            !BACnetStack_SetPropertyEnabled(g_deviceInstance, outputTypes[i], 1,
+                                            PROPERTY_IDENTIFIER_RELINQUISH_DEFAULT, true) ||
+            !BACnetStack_SetPropertyWritable(g_deviceInstance, outputTypes[i], 1,
+                                             PROPERTY_IDENTIFIER_PRESENT_VALUE, true)) {
+            printf("Error: Failed to make object type %u instance 1 commandable.\n", outputTypes[i]);
+            return 1;
+        }
     }
 
     // --- Configure intrinsic ALARMING (AE-N-I-B / AE-ACK-B / AE-INFO-B) ------
     // 1) Make Analog Value 1 "Diamond" writable so a client (or the 'a'/'n' keys)
     //    can drive its Present_Value across an alarm limit.
-    BACnetStack_SetPropertyWritable(g_deviceInstance, OBJECT_TYPE_ANALOG_VALUE,
-                                    ANALOG_VALUE_INSTANCE, PROPERTY_IDENTIFIER_PRESENT_VALUE, true);
+    if (!BACnetStack_SetPropertyWritable(g_deviceInstance, OBJECT_TYPE_ANALOG_VALUE,
+                                         ANALOG_VALUE_INSTANCE, PROPERTY_IDENTIFIER_PRESENT_VALUE, true)) {
+        printf("Error: Failed to make Analog Value 1 (Diamond) Present_Value writable.\n");
+        return 1;
+    }
 
     // 2) Create Notification Class 1 "Jade" - it holds the recipient list and the
     //    notification priority for each transition (to-offnormal / to-fault / to-normal).
