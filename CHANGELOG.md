@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-07-15
+## [1.1.0] - unreleased
+
+> Not tagged yet: `v1.0.0` is the only tag in this repository. `release.yml` publishes binaries on a `v*.*.*`
+> tag, so until that tag exists this section describes what is on the
+> branch, not what shipped.
 
 ### Fixed
 
