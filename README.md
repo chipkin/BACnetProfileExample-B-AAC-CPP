@@ -13,7 +13,7 @@ Part of the CAS BACnet Stack **BACnet profile example series** - one repository
 per BACnet device profile. This example claims **only** B-AAC.
 
 > **Versions:** this document describes **example v1.1.0**, built and verified
-> against **CAS BACnet Stack 6.0.0.0** at **Protocol_Revision 24**, with the
+> against **CAS BACnet Stack 5.4.2.0** at **Protocol_Revision 24**, with the
 > vendored `common/` helper at **v1.3.0**. Running the example prints all three.
 
 > **B-AAC is not fully claimable with the standard stack yet.** This example
@@ -128,6 +128,59 @@ as a Chipkin demo. None of it is cosmetic.
 > a config file, or a `--deviceName` argument).
 
 `main.cpp` marks this block with a `CHANGE ALL OF THIS BEFORE YOU SHIP` banner.
+
+## Extending the example
+
+### Who serves what: the application or the stack?
+
+The single most common question reading `main.cpp` is "who answers this property?"
+For the Analog Value **"Diamond"** - the alarm-capable object, and the most
+interesting one in this example:
+
+| Property | Served by | How |
+|---|---|---|
+| `Object_Identifier` | **stack** | generated from the object you added |
+| `Object_Type` | **stack** | generated |
+| `Object_List` | **stack** | generated (Device object) |
+| `Property_List` | **stack** | generated |
+| `Status_Flags` | **stack** | generated (and reflects the alarm state) |
+| `Event_State` | **stack** | **computed** - because this example arms an intrinsic OutOfRange algorithm on Diamond (`SetIntrinsicOutOfRangeAlgorithm` + `SetAlarmsAndEventsForObjectEnabled`), the stack drives Event_State to `normal` / `high-limit` / `low-limit`. On an object with **no** alarming, nothing serves Event_State and it reads its datatype default `normal(0)` by coincidence - the opposite situation. |
+| `Notification_Class` | **you** | `GetPropertyUnsignedInteger` - points at Jade (NC 1) |
+| `Present_Value` | **you** | `GetPropertyReal` |
+| `Object_Name` | **you** | `GetPropertyCharString` |
+| `Units` | **you** | `GetPropertyEnumerated` |
+
+That `Event_State` row is the whole point of B-AAC: arming the algorithm is what
+turns a plain writable Analog Value into an alarm source, and it is why
+`Event_State` moves from "defaulted by coincidence" to "genuinely computed."
+
+### Adding an object - read this first
+
+Adding an object is the easiest place to ship a silent non-conformance. The
+callbacks are **not uniformly strict**: `GetPropertyReal` / `GetPropertyEnumerated`
+/ `GetPropertyUnsignedInteger` match on object type **and instance**, but a Get
+callback returning `false` does **not** reliably produce an error. The stack errors
+only for a short list (Present_Value, Number_Of_States, Relinquish_Default,
+Local_Date, Local_Time, a Network Port's APDU_Length); for **everything else** it
+**silently substitutes a default** - `Object_Name` -> the literal `"undefined"`,
+`Units` -> `no-units(95)` - while `Property_List` still advertises the property.
+
+So a half-added object looks **healthy** on a scan and is non-conformant. When you
+add an instance:
+
+1. Add its instance constant (naming: a second object of a type is `"<Colour> 2"`).
+2. `BACnetStack_AddObject` it in `main`, checking the return like every other call.
+3. Serve **every** required property in the relevant Get callbacks - for an Analog
+   Value that is `Present_Value`, `Object_Name`, and `Units`.
+4. If it should alarm, arm it (`SetAlarmsAndEventsForObjectEnabled` +
+   `SetIntrinsicOutOfRangeAlgorithm`) and wire it to a Notification Class.
+5. Read back every required property of the new object and **diff it against an
+   existing one**. Anything reading `"undefined"`, `no-units`, or `0` where the
+   existing object returns something real is a step you missed. "It scanned OK" is
+   the failure mode, not evidence against it.
+
+The block comment above the Get callbacks in `main.cpp` ("ADDING AN OBJECT? READ
+THIS FIRST") is the in-code version of this.
 
 ## Requires the CAS BACnet Stack (licensed product)
 

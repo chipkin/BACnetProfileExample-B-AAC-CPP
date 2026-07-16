@@ -911,6 +911,9 @@ bool ReinitializeDevice(const uint32_t deviceInstance, const uint32_t reinitiali
                         const char* password, const uint32_t passwordLength,
                         uint32_t* errorCode) {
     if (deviceInstance != g_deviceInstance) {
+        // Not our device. Set *errorCode even here (see the DCC note): an unset
+        // false return ships the meaningless "Error Code = success(84)".
+        *errorCode = ERROR_CODE_OPTIONAL_FUNCTIONALITY_NOT_SUPPORTED;
         return false;
     }
     if (!PasswordAccepted(password, passwordLength)) {
@@ -1279,7 +1282,8 @@ int main(int argc, char** argv) {
             true,               // use the ADDRESS choice
             0,                  // network number 0 = this local network
             recipientMac, sizeof(recipientMac))) {
-        printf("FYI: could not seed the Notification Class recipient.\n");
+        printf("Error: could not seed the Notification Class recipient (Jade).\n");
+        return 1;
     }
 
     // 4) Turn on intrinsic event reporting for Diamond, routed through Jade.
@@ -1288,7 +1292,8 @@ int main(int argc, char** argv) {
             NOTIFICATION_CLASS_INSTANCE, NOTIFY_TYPE_ALARM,
             true /*enableToOffNormal*/, false /*enableToFault*/, true /*enableToNormal*/,
             true /*enableEventDetection*/)) {
-        printf("FYI: could not enable alarms on Analog Value 1 (Diamond).\n");
+        printf("Error: could not enable alarms on Analog Value 1 (Diamond).\n");
+        return 1;
     }
 
     // 5) Give Diamond an OutOfRange event algorithm: NORMAL while
@@ -1299,7 +1304,8 @@ int main(int argc, char** argv) {
             ANALOG_VALUE_LOW_LIMIT, ANALOG_VALUE_HIGH_LIMIT, ANALOG_VALUE_DEADBAND,
             true /*enableLowLimit*/, true /*enableHighLimit*/,
             ANALOG_VALUE_TIME_DELAY, false, 0, true /*enable*/)) {
-        printf("FYI: could not arm the OutOfRange algorithm on Diamond.\n");
+        printf("Error: could not arm the OutOfRange algorithm on Diamond.\n");
+        return 1;
     }
 
     // Who-Is is answered automatically. The spec also requires a device to
