@@ -13,7 +13,7 @@ Part of the CAS BACnet Stack **BACnet profile example series** - one repository
 per BACnet device profile. This example claims **only** B-AAC.
 
 > **Versions:** this document describes **example v1.1.0**, built and verified
-> against **CAS BACnet Stack 5.4.2.0** at **Protocol_Revision 24**, with the
+> against **CAS BACnet Stack 6.0.0.0** at **Protocol_Revision 24**, with the
 > vendored `common/` helper at **v1.3.0**. Running the example prints all three.
 
 > **B-AAC is not fully claimable with the standard stack yet.** This example
