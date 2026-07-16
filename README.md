@@ -9,8 +9,12 @@ alarms** (EventNotifications when a value goes out of range), accepts
 **AcknowledgeAlarm** and **GetEventInformation**, synchronises its clock, and
 handles **DeviceCommunicationControl** and **ReinitializeDevice**.
 
-> **Versions:** this document describes **example v1.0.0**, built and verified
-> against **CAS BACnet Stack 5.4.2.0** at **Protocol_Revision 24**.
+Part of the CAS BACnet Stack **BACnet profile example series** - one repository
+per BACnet device profile. This example claims **only** B-AAC.
+
+> **Versions:** this document describes **example v1.1.0**, built and verified
+> against **CAS BACnet Stack 6.0.0.0** at **Protocol_Revision 24**, with the
+> vendored `common/` helper at **v1.2.0**. Running the example prints all three.
 
 > **B-AAC is not fully claimable with the standard stack yet.** This example
 > implements every B-AAC capability the standard CAS BACnet Stack DLL exposes, and
@@ -104,7 +108,8 @@ not free or open source, no public/trial build. The stack is the **private** git
 submodule `submodules/cas-bacnet-stack`; you can only fetch and build it with a CAS
 BACnet Stack license. **To get the stack, contact Chipkin:**
 <https://store.chipkin.com/services/stacks/bacnet-stack> or sales@chipkin.com. You
-can still read all of this example's source on GitHub.
+do not need a stack licence to *read* this example's own source: every file outside
+submodules/ is CC0 public domain. The licence is what lets you *build* it.
 
 ## Build & run
 
