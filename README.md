@@ -123,9 +123,9 @@ cmake --build build --config Release
 .\build\Release\BACnetExampleBAAC.exe   # Windows
 ```
 
-The first build compiles the whole CAS BACnet Stack (~460 files) and takes a few
+The first build compiles the whole CAS BACnet Stack (~600 files) and takes a few
 minutes; later builds are fast. Use `-D CAS_STACK_DIR=/path` to point at a stack
-elsewhere. Options: `--port <n>` (default 47808), `--deviceID <n>` (default 389004).
+elsewhere. Options: `--port <n>` (default 47808), `--deviceID <n>` (default 389004), `--help` (show usage and exit), `--version` (print the example, stack, and `common/` versions and exit).
 Interactive keys: `h` help, `q` quit, up/down nudge Analog Input 1.
 
 ## Verify
