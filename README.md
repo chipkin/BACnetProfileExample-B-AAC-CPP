@@ -9,8 +9,12 @@ alarms** (EventNotifications when a value goes out of range), accepts
 **AcknowledgeAlarm** and **GetEventInformation**, synchronises its clock, and
 handles **DeviceCommunicationControl** and **ReinitializeDevice**.
 
-> **Versions:** this document describes **example v1.0.0**, built and verified
-> against **CAS BACnet Stack 5.4.2.0** at **Protocol_Revision 24**.
+Part of the CAS BACnet Stack **BACnet profile example series** - one repository
+per BACnet device profile. This example claims **only** B-AAC.
+
+> **Versions:** this document describes **example v1.1.0**, built and verified
+> against **CAS BACnet Stack 6.0.0.0** at **Protocol_Revision 24**, with the
+> vendored `common/` helper at **v1.3.0**. Running the example prints all three.
 
 > **B-AAC is not fully claimable with the standard stack yet.** This example
 > implements every B-AAC capability the standard CAS BACnet Stack DLL exposes, and
@@ -66,7 +70,7 @@ second notification). By default the recipient is the **local subnet broadcast**
 ## The device this example creates
 
 ```
-Device 389001  "Rainbow"   (Vendor 389 - Chipkin Automation Systems)
+Device 389004  "Rainbow"   (Vendor 389 - Chipkin Automation Systems)
     ├── Analog Input  1       "Bronze"      read-only sensor (REAL, deg C)
     ├── Binary Input  1       "Emerald"     read-only sensor (active/inactive)
     ├── Multi-State Input 1   "Hot Pink"    read-only sensor (state 1..3)
@@ -97,6 +101,87 @@ because the standard CAS BACnet Stack DLL does not yet expose them. Full detail 
   notification sender requires a recipient **address**, so this example addresses
   the recipient by address (local broadcast) and sends UNCONFIRMED notifications.
 
+## Before you ship
+
+This example is a tutorial, and it identifies itself as one. Everything in this
+table is read by clients and shown to the operator in **every discovery tool on
+the network**. Left as-is, your product appears on a real site announcing itself
+as a Chipkin demo. None of it is cosmetic.
+
+| Constant (`main.cpp`) | Ships as | Change it to |
+|---|---|---|
+| `VENDOR_IDENTIFIER` | `389` (Chipkin) | **Your** company's vendor ID. Assigned by ASHRAE, free: <https://bacnet.org/assigned-vendor-ids/> |
+| `VENDOR_NAME` | `Chipkin Automation Systems` | Your company name - must match the vendor ID above. |
+| `DEVICE_NAME` | `"Rainbow"` | Your device's `Object_Name`. **Must be unique across the BACnet internetwork** - see the note below. |
+| `MODEL_NAME` | `CAS BACnet Stack Example - B-AAC` | Your model designation - what a building operator reads to identify your device. |
+| `DEVICE_DESCRIPTION` | a description of *this example* | What your device actually is. |
+| `FIRMWARE_REVISION` / `APPLICATION_SOFTWARE_VERSION` | `1.0.0` | Your real versions - wire them to your build. |
+| `DCC_PASSWORD` | `""` (no password) | Set your device's secret, or leave empty to accept any DeviceCommunicationControl. It crosses the wire in **plaintext** - a guard against accidents, not a security boundary. |
+| Device instance | `389004` (`--deviceID` overrides) | Must be unique on the internetwork. BACnet requires this to be configurable; keep it so. |
+
+> **`Object_Name` uniqueness is the one that will bite you.** The device instance
+> is runtime-configurable via `--deviceID`, but `DEVICE_NAME` is a compile-time
+> constant. Ship two units and configure their instances correctly, and **both
+> still announce `Object_Name "Rainbow"`** - a spec violation, and exactly the
+> uniqueness problem the code comments warn about. In a real product,
+> `Object_Name` must be per-unit configurable too (serial number, DIP switches,
+> a config file, or a `--deviceName` argument).
+
+`main.cpp` marks this block with a `CHANGE ALL OF THIS BEFORE YOU SHIP` banner.
+
+## Extending the example
+
+### Who serves what: the application or the stack?
+
+The single most common question reading `main.cpp` is "who answers this property?"
+For the Analog Value **"Diamond"** - the alarm-capable object, and the most
+interesting one in this example:
+
+| Property | Served by | How |
+|---|---|---|
+| `Object_Identifier` | **stack** | generated from the object you added |
+| `Object_Type` | **stack** | generated |
+| `Object_List` | **stack** | generated (Device object) |
+| `Property_List` | **stack** | generated |
+| `Status_Flags` | **stack** | generated (and reflects the alarm state) |
+| `Event_State` | **stack** | **computed** - because this example arms an intrinsic OutOfRange algorithm on Diamond (`SetIntrinsicOutOfRangeAlgorithm` + `SetAlarmsAndEventsForObjectEnabled`), the stack drives Event_State to `normal` / `high-limit` / `low-limit`. On an object with **no** alarming, nothing serves Event_State and it reads its datatype default `normal(0)` by coincidence - the opposite situation. |
+| `Notification_Class` | **you** | `GetPropertyUnsignedInteger` - points at Jade (NC 1) |
+| `Present_Value` | **you** | `GetPropertyReal` |
+| `Object_Name` | **you** | `GetPropertyCharString` |
+| `Units` | **you** | `GetPropertyEnumerated` |
+
+That `Event_State` row is the whole point of B-AAC: arming the algorithm is what
+turns a plain writable Analog Value into an alarm source, and it is why
+`Event_State` moves from "defaulted by coincidence" to "genuinely computed."
+
+### Adding an object - read this first
+
+Adding an object is the easiest place to ship a silent non-conformance. The
+callbacks are **not uniformly strict**: `GetPropertyReal` / `GetPropertyEnumerated`
+/ `GetPropertyUnsignedInteger` match on object type **and instance**, but a Get
+callback returning `false` does **not** reliably produce an error. The stack errors
+only for a short list (Present_Value, Number_Of_States, Relinquish_Default,
+Local_Date, Local_Time, a Network Port's APDU_Length); for **everything else** it
+**silently substitutes a default** - `Object_Name` -> the literal `"undefined"`,
+`Units` -> `no-units(95)` - while `Property_List` still advertises the property.
+
+So a half-added object looks **healthy** on a scan and is non-conformant. When you
+add an instance:
+
+1. Add its instance constant (naming: a second object of a type is `"<Colour> 2"`).
+2. `BACnetStack_AddObject` it in `main`, checking the return like every other call.
+3. Serve **every** required property in the relevant Get callbacks - for an Analog
+   Value that is `Present_Value`, `Object_Name`, and `Units`.
+4. If it should alarm, arm it (`SetAlarmsAndEventsForObjectEnabled` +
+   `SetIntrinsicOutOfRangeAlgorithm`) and wire it to a Notification Class.
+5. Read back every required property of the new object and **diff it against an
+   existing one**. Anything reading `"undefined"`, `no-units`, or `0` where the
+   existing object returns something real is a step you missed. "It scanned OK" is
+   the failure mode, not evidence against it.
+
+The block comment above the Get callbacks in `main.cpp` ("ADDING AN OBJECT? READ
+THIS FIRST") is the in-code version of this.
+
 ## Requires the CAS BACnet Stack (licensed product)
 
 This example **builds against the CAS BACnet Stack, a commercial Chipkin product** -
@@ -104,7 +189,8 @@ not free or open source, no public/trial build. The stack is the **private** git
 submodule `submodules/cas-bacnet-stack`; you can only fetch and build it with a CAS
 BACnet Stack license. **To get the stack, contact Chipkin:**
 <https://store.chipkin.com/services/stacks/bacnet-stack> or sales@chipkin.com. You
-can still read all of this example's source on GitHub.
+do not need a stack licence to *read* this example's own source: every file outside
+submodules/ is CC0 public domain. The licence is what lets you *build* it.
 
 ## Build & run
 
@@ -118,9 +204,9 @@ cmake --build build --config Release
 .\build\Release\BACnetExampleBAAC.exe   # Windows
 ```
 
-The first build compiles the whole CAS BACnet Stack (~460 files) and takes a few
+The first build compiles the whole CAS BACnet Stack (~600 files) and takes a few
 minutes; later builds are fast. Use `-D CAS_STACK_DIR=/path` to point at a stack
-elsewhere. Options: `--port <n>` (default 47808), `--deviceID <n>` (default 389001).
+elsewhere. Options: `--port <n>` (default 47808), `--deviceID <n>` (default 389004), `--help` (show usage and exit), `--version` (print the example, stack, and `common/` versions and exit).
 Interactive keys: `h` help, `q` quit, up/down nudge Analog Input 1.
 
 ## Verify
@@ -128,8 +214,8 @@ Interactive keys: `h` help, `q` quit, up/down nudge Analog Input 1.
 With the [CAS BACnet Explorer](https://store.chipkin.com/products/tools/cas-bacnet-explorer)
 (or any client):
 
-1. **Discover** - Who-Is -> I-Am from `389001` (vendor `389`).
-2. **Object model** - nine objects incl. Analog Value "Diamond" and Notification
+1. **Discover** - Who-Is -> I-Am from `389004` (vendor `389`).
+2. **Object model** - ten objects incl. Analog Value "Diamond" and Notification
    Class "Jade". `Object_List` lists them all; `Protocol_Revision` = 24.
 3. **ReadPropertyMultiple** - read several properties of "Diamond" in one request
    (DS-RPM-B).
