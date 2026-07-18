@@ -966,12 +966,24 @@ bool ReinitializeDevice(const uint32_t deviceInstance, const uint32_t reinitiali
         *errorCode = ERROR_CODE_PASSWORD_FAILURE;
         return false;
     }
+    // NOTE: do NOT restart here. Returning true only tells the stack the request
+    // was accepted - it encodes the SimpleACK, which does not go out on the wire
+    // until a later BACnetStack_Tick(). Reboot/exit/reset at this point and the
+    // ACK is never transmitted: the client times out and reports this device as
+    // unresponsive even though it obeyed. So record a deadline, return, let the
+    // ACK ship, and do the actual restart from the main loop.
     if (reinitializedState == REINITIALIZE_STATE_COLDSTART) {
-        printf("ReinitializeDevice: COLDSTART (a real device would reboot here)\n");
+        printf("ReinitializeDevice: COLDSTART accepted (restarting in %u ms)\n",
+               (unsigned)CASExampleHelper::RESTART_DELAY_MS);
+        CASExampleHelper::RequestRestart(CASExampleHelper::RestartKind::Cold,
+                                         CASExampleHelper::RESTART_DELAY_MS);
         return true;
     }
     if (reinitializedState == REINITIALIZE_STATE_WARMSTART) {
-        printf("ReinitializeDevice: WARMSTART (a real device would re-init here)\n");
+        printf("ReinitializeDevice: WARMSTART accepted (re-initializing in %u ms)\n",
+               (unsigned)CASExampleHelper::RESTART_DELAY_MS);
+        CASExampleHelper::RequestRestart(CASExampleHelper::RestartKind::Warm,
+                                         CASExampleHelper::RESTART_DELAY_MS);
         return true;
     }
     // Backup/restore states (2..6) are not supported by this example. The
@@ -1380,6 +1392,47 @@ int main(int argc, char** argv) {
     bool running = true;
     while (running) {
         BACnetStack_Tick();
+
+        // --- Deferred restart (DM-RD-B) -------------------------------------
+        // ReinitializeDevice only ARMED the restart; the SimpleACK has now had a
+        // full second of ticks to reach the wire, so it is safe to act.
+        //
+        // A real device calls its platform reset here (reboot / watchdog / a
+        // longjmp back to power-on init) and never returns from this block. This
+        // example has no hardware to reset, so it demonstrates the equivalent
+        // in-process work honestly rather than pretending:
+        //
+        //   COLDSTART - the full power-on path: every object returns to its
+        //               start-up value, all commanded priorities are relinquished,
+        //               and the device re-announces itself with an I-Am (which is
+        //               what a client watches for to know the restart finished).
+        //   WARMSTART - re-initialize communications but keep the process state a
+        //               reboot would have preserved; the outputs a controls
+        //               engineer commanded stay commanded. Still re-announces.
+        //
+        // A real device would also record Last_Restart_Reason and
+        // Time_Of_Device_Restart at this point - see docs/deferred-restart-adoption.md.
+        CASExampleHelper::RestartKind restartKind;
+        if (CASExampleHelper::RestartDue(&restartKind)) {
+            if (restartKind == CASExampleHelper::RestartKind::Cold) {
+                printf("Restart: COLDSTART - restoring power-on state.\n");
+                g_analogInput1Value = 21.5f;
+                g_analogValue1Value = 50.0f;
+                const Commandable analogOutputAtPowerOn = { { false }, { 0 }, 20.0 };
+                const Commandable binaryOutputAtPowerOn = { { false }, { 0 }, 0.0 };
+                const Commandable multiStateOutputAtPowerOn = { { false }, { 0 }, 1.0 };
+                g_analogOutput = analogOutputAtPowerOn;
+                g_binaryOutput = binaryOutputAtPowerOn;
+                g_multiStateOutput = multiStateOutputAtPowerOn;
+            } else {
+                printf("Restart: WARMSTART - re-initializing, keeping commanded values.\n");
+            }
+            // Both kinds re-announce: a restarted device must issue an I-Am so
+            // clients that had it bound learn it is back (and re-bind if its
+            // address changed).
+            CASExampleHelper::SendIAm(g_deviceInstance);
+            printf("Restart: complete. Device %u is back.\n", g_deviceInstance);
+        }
 
         switch (CASExampleHelper::PollKey()) {
             case CASExampleHelper::KeyCommand::Help:
