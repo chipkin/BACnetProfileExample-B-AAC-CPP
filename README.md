@@ -14,7 +14,8 @@ per BACnet device profile. This example claims **only** B-AAC.
 
 > **Versions:** this document describes **example v1.1.0**, built and verified
 > against **CAS BACnet Stack 6.0.0.0** at **Protocol_Revision 24**, with the
-> vendored `common/` helper at **v1.3.0**. Running the example prints all three.
+> vendored `common/` helper at **v1.5.1**. Running the example prints all three -
+> if what it prints disagrees with this line, trust the program and check `CHANGELOG.md`.
 
 > **B-AAC is not fully claimable with the standard stack yet.** This example
 > implements every B-AAC capability the standard CAS BACnet Stack DLL exposes, and
@@ -205,9 +206,31 @@ cmake --build build --config Release
 ```
 
 The first build compiles the whole CAS BACnet Stack (~600 files) and takes a few
-minutes; later builds are fast. Use `-D CAS_STACK_DIR=/path` to point at a stack
+minutes; later builds are fast - add `--parallel` to cut that down substantially. Use `-D CAS_STACK_DIR=/path` to point at a stack
 elsewhere. Options: `--port <n>` (default 47808), `--deviceID <n>` (default 389004), `--help` (show usage and exit), `--version` (print the example, stack, and `common/` versions and exit).
 Interactive keys: `h` help, `q` quit, up/down nudge Analog Input 1.
+
+### Link modes
+
+This example links the stack through the `CASBACnetStack::Adapter` CMake target
+(`submodules/cas-bacnet-stack/adapters/cpp`). `CAS_BACNET_STACK_LINK` picks how:
+
+```bash
+cmake -B build -S .                                   # SOURCE (default) - compiles the stack in
+cmake -B build -S . -D CAS_BACNET_STACK_LINK=STATIC    # link a prebuilt .lib/.a
+cmake -B build -S . -D CAS_BACNET_STACK_LINK=DLL       # load a prebuilt .dll/.so at runtime
+```
+
+**Application code is identical in every mode.** `main.cpp` and `common/` call
+`BACnetStack_AddDevice(...)` and friends by the exact export name; switching modes changes
+only the CMake flag, never a line of your code. All three modes require calling
+`LoadBACnetFunctions()` once at the top of `main()` before any other `BACnetStack_*` call - in
+`DLL` mode that is the step that binds the symbols, and in every mode it runs a version
+handshake. If it fails, `CASBACnetStackAdapter_LastError()` says why and the program exits
+with a message rather than crashing.
+
+`STATIC` and `DLL` each need their library built first; `SOURCE` needs nothing extra, which is
+why it is the default and what the published release binaries are built with.
 
 ## Verify
 

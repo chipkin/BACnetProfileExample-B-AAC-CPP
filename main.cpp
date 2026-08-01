@@ -80,7 +80,9 @@
 
 #include "CASExampleHelper.h"
 #include "CASBACnetStackExampleConstants.h"
-#include "CASBACnetStackDLL.h" // the CAS BACnet Stack C API (BACnetStack_*)
+#include "CASBACnetStackAdapter.h" // the CAS BACnet Stack C API (BACnetStack_*); call
+                                    // LoadBACnetFunctions() before any BACnetStack_* call -
+                                    // see the top of main() below.
 
 #include <stdio.h>
 #include <string.h>
@@ -276,14 +278,13 @@ static bool ReadPrioritySlot(const Commandable* c, uint32_t propertyIdentifier,
 // stack uses a separate callback. We return true (and fill *value) when we
 // recognise the (object, property) pair, and false otherwise.
 //
-// WHAT false ACTUALLY DOES - and this is the most important paragraph in the
-// file, because an earlier version of this comment got it backwards. Returning
-// false does NOT reliably produce a BACnet error. The stack only errors for the
-// handful of properties it refuses to invent (BACnetBusinessLogic.cpp: the
-// valueShouldBeInitialized switch) - Present_Value, Number_Of_States,
-// Relinquish_Default, Local_Date, Local_Time, and a Network Port's APDU_Length.
-// For EVERYTHING ELSE, a false return falls through to GetDefaultPropertyValue()
-// (BACnetDBDevice.cpp) and the stack SILENTLY SUBSTITUTES a default:
+// WHAT false ACTUALLY DOES - the most important paragraph in this file, and the
+// opposite of what most people assume. Returning false does NOT reliably produce
+// a BACnet error. The stack only errors for the handful of properties it refuses
+// to invent: Present_Value, Number_Of_States, Relinquish_Default, Local_Date,
+// Local_Time, and a Network Port's APDU_Length.
+// For EVERYTHING ELSE, a false return means the stack SILENTLY SUBSTITUTES a
+// default:
 //     Object_Name -> the literal string "undefined"
 //     Units       -> no-units (95)
 //     otherwise   -> a datatype zero-value
@@ -937,9 +938,6 @@ bool DeviceCommunicationControl(const uint32_t deviceInstance, const uint8_t ena
     //
     // This differs from the SetProperty* callbacks, which DO have a sensible
     // fallback (writeAccessDenied) - so do not carry the habit across.
-    // (The stack's own comment at that site says "otherwise assume
-    // passwordFailure"; the code does not do that. Trust the code, not the
-    // comment - including this one: go read it.)
     return true;
 }
 
@@ -966,12 +964,24 @@ bool ReinitializeDevice(const uint32_t deviceInstance, const uint32_t reinitiali
         *errorCode = ERROR_CODE_PASSWORD_FAILURE;
         return false;
     }
+    // NOTE: do NOT restart here. Returning true only tells the stack the request
+    // was accepted - it encodes the SimpleACK, which does not go out on the wire
+    // until a later BACnetStack_Tick(). Reboot/exit/reset at this point and the
+    // ACK is never transmitted: the client times out and reports this device as
+    // unresponsive even though it obeyed. So record a deadline, return, let the
+    // ACK ship, and do the actual restart from the main loop.
     if (reinitializedState == REINITIALIZE_STATE_COLDSTART) {
-        printf("ReinitializeDevice: COLDSTART (a real device would reboot here)\n");
+        printf("ReinitializeDevice: COLDSTART accepted (restarting in %u ms)\n",
+               (unsigned)CASExampleHelper::RESTART_DELAY_MS);
+        CASExampleHelper::RequestRestart(CASExampleHelper::RestartKind::Cold,
+                                         CASExampleHelper::RESTART_DELAY_MS);
         return true;
     }
     if (reinitializedState == REINITIALIZE_STATE_WARMSTART) {
-        printf("ReinitializeDevice: WARMSTART (a real device would re-init here)\n");
+        printf("ReinitializeDevice: WARMSTART accepted (re-initializing in %u ms)\n",
+               (unsigned)CASExampleHelper::RESTART_DELAY_MS);
+        CASExampleHelper::RequestRestart(CASExampleHelper::RestartKind::Warm,
+                                         CASExampleHelper::RESTART_DELAY_MS);
         return true;
     }
     // Backup/restore states (2..6) are not supported by this example. The
@@ -1059,6 +1069,18 @@ static void LocalBroadcastConnString(uint8_t out[6]) {
 int main(int argc, char** argv) {
     // Show printf output immediately, even when stdout is piped to a file.
     setvbuf(stdout, NULL, _IONBF, 0);
+
+    // --- Load the CAS BACnet Stack -------------------------------------------
+    // Required in every link mode (source/static/DLL) before any other
+    // BACnetStack_* call - see CASBACnetStackAdapter.h. In DLL mode this is the
+    // step that actually resolves the symbols; skipping it there is a null-pointer
+    // call, not a silent no-op, so it comes before even --version (which calls
+    // BACnetStack_GetAPIMajorVersion() to print the linked stack's version).
+    if (!LoadBACnetFunctions()) {
+        fprintf(stderr, "Error: failed to load the CAS BACnet Stack: %s\n",
+                CASBACnetStackAdapter_LastError());
+        return 1;
+    }
 
     // --- Command line + version --------------------------------------------
     // --help / --version print and exit, so handle them before we bind a socket
@@ -1193,10 +1215,15 @@ int main(int argc, char** argv) {
     // Every BACnet device (Protocol_Revision 17+) must have at least one Network
     // Port object describing the port it talks on. This one is the BACnet/IP
     // application port; it is the lowest layer, so its reference port is "none".
-    if (!BACnetStack_AddNetworkPortObject(
+    // networkNumber 0 with quality "unknown" describes a local port that has not
+    // learned its network number - the right answer for a device that is not a
+    // router and has not been told one.
+    if (!BACnetStack_AddNetworkPortObjectWithNetworkNumber(
             g_deviceInstance, NETWORK_PORT_INSTANCE,
             NETWORK_PORT_NETWORK_TYPE_IPV4,
             NETWORK_PORT_PROTOCOL_LEVEL_BACNET_APPLICATION,
+            0,  // networkNumber: not configured
+            NETWORK_NUMBER_QUALITY_UNKNOWN,
             NETWORK_PORT_REFERENCE_PORT_NONE)) {
         printf("Error: Failed to add Network Port 1 (Vermilion).\n");
         return 1;
@@ -1237,9 +1264,8 @@ int main(int argc, char** argv) {
     // writing NULL relinquishes it, and the highest-priority non-null slot (or
     // Relinquish_Default) wins.
     //
-    // HONEST NOTE, because an earlier version of this comment was wrong and a
-    // reader would have found out the hard way: for ANALOG/BINARY/MULTI-STATE
-    // OUTPUT the three calls below are effectively NO-OPS. They reproduce the
+    // WORTH KNOWING BEFORE YOU COPY THIS: for ANALOG/BINARY/MULTI-STATE OUTPUT
+    // the three calls below are effectively NO-OPS. They reproduce the
     // stack's own defaults. Verified in the stack source:
     //   - Present_Value on an Analog Output already defaults to required AND
     //     writable (BACnetDBPropertyProfile.cpp: presentValue -> SetProperty(
@@ -1259,11 +1285,10 @@ int main(int argc, char** argv) {
     // enabled before it will treat the object as commandable. Omit these calls on
     // an Analog Value and it silently is not commandable.
     //
-    // Carry the INSTANCE alongside the type: this loop used to hardcode a literal
-    // 1 while every other line in the file used the named constants. On these
-    // output types that mismatch is benign (see above) - but it is exactly the
-    // drift that IS fatal on a Value type, and a reader copying it would inherit
-    // the bug without the benignity. Say what you mean.
+    // Carry the INSTANCE alongside the type rather than assuming instance 1. On
+    // these output types the distinction is benign (see above) - but it is fatal
+    // on a Value type, where the enable must land on the exact object you mean.
+    // Say what you mean, so the pattern stays correct when it is copied.
     struct CommandableObject { uint16_t type; uint32_t instance; };
     const CommandableObject outputs[] = {
         { OBJECT_TYPE_ANALOG_OUTPUT,      ANALOG_OUTPUT_INSTANCE },
@@ -1375,6 +1400,47 @@ int main(int argc, char** argv) {
     bool running = true;
     while (running) {
         BACnetStack_Tick();
+
+        // --- Deferred restart (DM-RD-B) -------------------------------------
+        // ReinitializeDevice only ARMED the restart; the SimpleACK has now had a
+        // full second of ticks to reach the wire, so it is safe to act.
+        //
+        // A real device calls its platform reset here (reboot / watchdog / a
+        // longjmp back to power-on init) and never returns from this block. This
+        // example has no hardware to reset, so it demonstrates the equivalent
+        // in-process work honestly rather than pretending:
+        //
+        //   COLDSTART - the full power-on path: every object returns to its
+        //               start-up value, all commanded priorities are relinquished,
+        //               and the device re-announces itself with an I-Am (which is
+        //               what a client watches for to know the restart finished).
+        //   WARMSTART - re-initialize communications but keep the process state a
+        //               reboot would have preserved; the outputs a controls
+        //               engineer commanded stay commanded. Still re-announces.
+        //
+        // A real device would also record Last_Restart_Reason and
+        // Time_Of_Device_Restart at this point - see docs/deferred-restart-adoption.md.
+        CASExampleHelper::RestartKind restartKind;
+        if (CASExampleHelper::RestartDue(&restartKind)) {
+            if (restartKind == CASExampleHelper::RestartKind::Cold) {
+                printf("Restart: COLDSTART - restoring power-on state.\n");
+                g_analogInput1Value = 21.5f;
+                g_analogValue1Value = 50.0f;
+                const Commandable analogOutputAtPowerOn = { { false }, { 0 }, 20.0 };
+                const Commandable binaryOutputAtPowerOn = { { false }, { 0 }, 0.0 };
+                const Commandable multiStateOutputAtPowerOn = { { false }, { 0 }, 1.0 };
+                g_analogOutput = analogOutputAtPowerOn;
+                g_binaryOutput = binaryOutputAtPowerOn;
+                g_multiStateOutput = multiStateOutputAtPowerOn;
+            } else {
+                printf("Restart: WARMSTART - re-initializing, keeping commanded values.\n");
+            }
+            // Both kinds re-announce: a restarted device must issue an I-Am so
+            // clients that had it bound learn it is back (and re-bind if its
+            // address changed).
+            CASExampleHelper::SendIAm(g_deviceInstance);
+            printf("Restart: complete. Device %u is back.\n", g_deviceInstance);
+        }
 
         switch (CASExampleHelper::PollKey()) {
             case CASExampleHelper::KeyCommand::Help:
