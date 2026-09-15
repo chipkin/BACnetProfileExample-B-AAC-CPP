@@ -15,26 +15,26 @@
 //
 //     DS-RP-B, DS-RPM-B   - ReadProperty + ReadPropertyMultiple,
 //     DS-WP-B, DS-WPM-B   - WriteProperty + WritePropertyMultiple,
-//     AE-N-I-B            - generate intrinsic alarm/event notifications (NEW),
-//     AE-ACK-B            - accept AcknowledgeAlarm (NEW),
-//     AE-INFO-B           - answer GetEventInformation (NEW),
-//     AE-CRL-B            - configurable event-recipient list (NEW, partial),
-//     SCHED-I-B           - internal scheduling (NOT YET - see TODO.md),
+//     AE-N-I-B            - generate intrinsic alarm/event notifications,
+//     AE-ACK-B            - accept AcknowledgeAlarm,
+//     AE-INFO-B           - answer GetEventInformation,
+//     AE-CRL-B            - configurable, writable event-recipient list,
+//     SCHED-I-B           - internal scheduling (Schedule + Calendar objects),
 //     DM-DCC-B            - DeviceCommunicationControl,
-//     DM-RD-B             - ReinitializeDevice (NEW),
-//     DM-TS-B / DM-UTC-B  - TimeSynchronization / UTCTimeSynchronization (NEW),
+//     DM-RD-B             - ReinitializeDevice,
+//     DM-TS-B / DM-UTC-B  - TimeSynchronization / UTCTimeSynchronization,
 //     DM-DDB-A,B, DM-DOB-B - Who-Is/I-Am (answer + initiate on start-up), Who-Has/I-Have.
 //
 // WHAT IS NOT IMPLEMENTED (see README.md "What this example does NOT do" + TODO.md):
-//   - SCHED-I-B: the standard CAS BACnet Stack DLL has no Schedule execution
-//     engine, so this example does not run a Weekly_Schedule against local time.
-//   - AE-CRL-B is partial: the Notification Class recipient is seeded at start-up;
-//     accepting a WriteProperty to Recipient_List is not wired here.
+//   - Calendar 1 "Cream"'s Date_List: there is no customer-facing export or
+//     callback to populate a Calendar object's Date_List (cas-bacnet-stack
+//     issue #963), so Schedule 1 "Saffron"'s one-off exception uses an inline
+//     calendar-date entry rather than a reference to Cream.
 //
 // The device keeps the B-ASC objects (three read-only inputs + three commandable
-// outputs + Network Port) and ADDS an alarm-capable Analog Value plus the
-// Notification Class that routes its alarms. Each object has a colour name (the
-// convention shared across this example series):
+// outputs + Network Port) and ADDS an alarm-capable Analog Value, the
+// Notification Class that routes its alarms, and a Schedule + Calendar pair.
+// Each object has a colour name (the convention shared across this example series):
 //
 //     Device 389004            "Rainbow"     (instance configurable with --deviceID)
 //     Analog Input  1          "Bronze"      (REAL, degrees Celsius; read-only)
@@ -44,8 +44,10 @@
 //     Binary Output 1          "Fuchsia"     (active / inactive; WRITABLE, commandable)
 //     Multi-State Output 1     "Indigo"      (state 1..3; WRITABLE, commandable)
 //     Analog Value 1           "Diamond"     (REAL, WRITABLE; intrinsic OutOfRange alarm)
-//     Notification Class 1     "Jade"        (routes Diamond's alarms to recipients)
+//     Notification Class 1     "Jade"        (routes Diamond's alarms; Recipient_List WRITABLE)
 //     Network Port 1           "Vermilion"   (the BACnet/IP port - required)
+//     Schedule 1               "Saffron"     (drives Chartreuse on a weekly + exception basis)
+//     Calendar 1               "Cream"       (see TODO.md - Date_List not evaluated)
 //
 // Output objects are COMMANDABLE: their Present_Value is driven by a 16-slot
 // BACnet Priority_Array. A WriteProperty(Present_Value, value, priority) sets a
@@ -70,8 +72,9 @@
 // Get*Property callbacks below, and a few are turned on with SetPropertyEnabled.
 //
 // Interactive keys (handled by the shared helper): h = help, q = quit,
-// up/down = nudge Analog Input 1 by +/-1.1. To fire an alarm, WriteProperty the
-// Analog Value's Present_Value above 90 or below 10. Command line: --port <n>,
+// up/down = nudge Analog Input 1 by +/-1.1, s = advance Schedule 1 ("Saffron")
+// with a Weekly_Schedule transition for right now. To fire an alarm, WriteProperty
+// the Analog Value's Present_Value above 90 or below 10. Command line: --port <n>,
 // --deviceID <n>.
 //
 // All the UDP/stack plumbing lives in common/CASExampleHelper so this file can
@@ -86,6 +89,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h> // time(), localtime_[sr]() - the SCHED-I-B demo-advance key (see KeyCommand::DemoAdvance)
 
 #if defined(_WIN32)
 #include <windows.h> // Sleep()
@@ -99,7 +103,7 @@ using namespace CASBACnetStackExampleConstants;
 // 1. Example + device configuration
 // -----------------------------------------------------------------------------
 static const char* APP_NAME = "BACnet B-AAC (Advanced Application Controller) Example - C++";
-static const char* APP_VERSION = "1.1.0";
+static const char* APP_VERSION = "1.2.0";
 
 // The device instance. BACnet requires this to be configurable, so it defaults
 // to 389004 and can be overridden on the command line with --deviceID.
@@ -206,20 +210,41 @@ static const uint8_t NC_PRIORITY_TO_OFFNORMAL = 100;
 static const uint8_t NC_PRIORITY_TO_FAULT = 50;
 static const uint8_t NC_PRIORITY_TO_NORMAL = 200;
 
-// Where Diamond's alarms are sent. This is the AE-CRL-B recipient list, seeded at
-// start-up (accepting a WriteProperty to Recipient_List = TODO; see TODO.md).
+// Where Diamond's alarms are sent. This is the AE-CRL-B recipient list (AddRecipientToNotificationClass
+// seeds it at start-up; Recipient_List is also registered WRITABLE below, so a management station can
+// redirect it at run time - see BACnetStack_SetPropertyWritable(..., PROPERTY_IDENTIFIER_RECIPIENT_LIST, true)).
 //
-// A recipient can be named two ways: by DEVICE instance (the stack would resolve
-// the address with Who-Is) or by ADDRESS. The standard CAS BACnet Stack only
-// implements the ADDRESS form for sending notifications (the device-instance form
-// reports "must specify a recipient address" - see TODO.md), so this example seeds
-// the recipient by ADDRESS. We default it to the LOCAL SUBNET BROADCAST and send
-// UNCONFIRMED notifications, so any BACnet client on the subnet sees Diamond's
-// alarms without us knowing its address ahead of time. For a single known client,
-// set RECIPIENT_USE_BROADCAST = false and fill in RECIPIENT_IP[].
+// A recipient can be named two ways: by DEVICE instance (the stack resolves the address itself, via its
+// Device-Address-Binding cache and a Who-Is heartbeat) or by ADDRESS. This example seeds the ADDRESS
+// form, defaulting to the LOCAL SUBNET BROADCAST with UNCONFIRMED notifications, so any BACnet client on
+// the subnet sees Diamond's alarms without us knowing its address ahead of time. For a single known
+// client, set RECIPIENT_USE_BROADCAST = false and fill in RECIPIENT_IP[]. A client that WriteProperty's
+// Recipient_List with a device-instance recipient instead works too: the stack's Acquire()/Resolve() DAB
+// path (cas-bacnet-stack issue #1328) chases it with Who-Is and starts delivering once it resolves.
 static const uint32_t RECIPIENT_PROCESS_IDENTIFIER = 1;
 static const bool RECIPIENT_USE_BROADCAST = true;
 static uint8_t RECIPIENT_IP[4] = { 0, 0, 0, 0 };  // used when not broadcasting
+
+// --- SCHED-I-B: Schedule 1 "Saffron" drives Analog Output 1 (Chartreuse) -------
+// A weekly transition sets Chartreuse to SCHEDULE_DEMO_VALUE; outside any scheduled
+// window Schedule_Default applies instead. Calendar 1 "Cream" exists as a readable
+// object alongside the exception (see TODO.md for why it is not wired to the
+// exception's period - cas-bacnet-stack issue #963).
+static const uint32_t SCHEDULE_INSTANCE = 1;             // "Saffron"
+static const uint32_t CALENDAR_INSTANCE = 1;              // "Cream"
+static const uint8_t SCHEDULE_WRITE_PRIORITY = 8;          // mid-range: below manual overrides at 1-7
+static const float SCHEDULE_DEFAULT_VALUE = 20.0f;         // Chartreuse's steady-state setpoint
+static const float SCHEDULE_DEMO_VALUE = 75.0f;            // the value a scheduled/demo transition applies
+static const float SCHEDULE_EXCEPTION_VALUE = 5.0f;        // the value the one-off exception applies
+
+// BACnet object type / property identifier numbers not already in
+// CASBACnetStackExampleConstants.h (verified against BACnetObjectType.h /
+// BACnetPropertyIdentifier.h at the pin).
+static const uint16_t OBJECT_TYPE_SCHEDULE = 17;
+static const uint16_t OBJECT_TYPE_CALENDAR = 6;
+static const uint32_t PROPERTY_IDENTIFIER_RELIABILITY = 103;
+static const uint32_t PROPERTY_IDENTIFIER_RECIPIENT_LIST = 102;
+static const uint32_t RELIABILITY_NO_FAULT_DETECTED = 0;
 
 // A WriteProperty to a commandable Present_Value carries a priority 1..16. When a
 // client omits it, BACnet uses 16 (the lowest priority) - so normalise anything
@@ -278,16 +303,43 @@ static bool ReadPrioritySlot(const Commandable* c, uint32_t propertyIdentifier,
 // stack uses a separate callback. We return true (and fill *value) when we
 // recognise the (object, property) pair, and false otherwise.
 //
-// WHAT false ACTUALLY DOES - the most important paragraph in this file, and the
-// opposite of what most people assume. Returning false does NOT reliably produce
-// a BACnet error. The stack only errors for the handful of properties it refuses
-// to invent: Present_Value, Number_Of_States, Relinquish_Default, Local_Date,
-// Local_Time, and a Network Port's APDU_Length.
+// THE errorCode OUT-PARAMETER. Every Get callback ends with uint32_t* errorCode.
+// The stack PRESETS it to success (84) before the call, and reads it only if you
+// return false. That gives a declining callback two distinct meanings:
+//
+//   1. return false and LEAVE errorCode ALONE  -> "I have no opinion on this
+//      property." The stack falls back to its own handling (see below).
+//   2. return false and SET *errorCode         -> "This read fails, with THIS
+//      BACnet error." The client gets exactly that Error-PDU.
+//
+// Option 2 is new (CAS BACnet Stack issue #974); before it, a Get callback had
+// no way to name an error at all. Do not reach for it reflexively - option 1 is
+// still the right answer most of the time, for the reason in the next paragraph.
+//
+// WHAT false-WITHOUT-AN-ERROR-CODE ACTUALLY DOES - the most important paragraph
+// in this file, and the opposite of what most people assume. It does NOT
+// reliably produce a BACnet error. The stack errors only for the handful of
+// properties it refuses to invent: Present_Value, Number_Of_States,
+// Relinquish_Default, Local_Date, Local_Time, and a Network Port's APDU_Length
+// (declining one of those now reads back as Error: read-access-denied, where
+// older stack versions said value-not-initialized).
 // For EVERYTHING ELSE, a false return means the stack SILENTLY SUBSTITUTES a
 // default:
 //     Object_Name -> the literal string "undefined"
 //     Units       -> no-units (95)
 //     otherwise   -> a datatype zero-value
+//
+// AND THAT FALLBACK IS LOAD-BEARING, WHICH IS WHY IT IS NOT "FIXED" HERE. It is
+// tempting to end every callback with *errorCode = unknown-property so nothing is
+// ever silently invented. That breaks the device. The stack relies on the
+// decline-and-fabricate path to answer required properties the application is
+// not expected to serve - the Device's Max_APDU_Length_Accepted, APDU_Timeout
+// and Number_Of_APDU_Retries among them. Name an error on the catch-all return
+// and those required properties start failing instead of answering.
+// So: set *errorCode ONLY where THIS device knows the read is wrong. There is
+// exactly one such case below (State_Text with an out-of-range array index); the
+// catch-all `return false` at the end of each callback deliberately leaves
+// errorCode alone.
 //
 // ADDING AN OBJECT? READ THIS FIRST.
 // The consequence is the opposite of reassuring. These callbacks are not
@@ -314,7 +366,8 @@ static bool ReadPrioritySlot(const Commandable* c, uint32_t propertyIdentifier,
 bool GetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType,
                      const uint32_t objectInstance, const uint32_t propertyIdentifier,
                      float* value, const bool useArrayIndex,
-                     const uint32_t propertyArrayIndex) {
+                     const uint32_t propertyArrayIndex, uint32_t* errorCode) {
+    (void)errorCode; // see "THE errorCode OUT-PARAMETER" below: every catch-all here declines without naming an error
     if (deviceInstance != g_deviceInstance) {
         return false;
     }
@@ -369,9 +422,20 @@ bool GetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType,
 bool GetPropertyEnumerated(const uint32_t deviceInstance, const uint16_t objectType,
                            const uint32_t objectInstance, const uint32_t propertyIdentifier,
                            uint32_t* value, const bool useArrayIndex,
-                           const uint32_t propertyArrayIndex) {
+                           const uint32_t propertyArrayIndex, uint32_t* errorCode) {
+    (void)errorCode;
+    (void)useArrayIndex;
+    (void)propertyArrayIndex;
     if (deviceInstance != g_deviceInstance) {
         return false;
+    }
+    // Reliability (required) on Schedule 1 (Saffron) and Calendar 1 (Cream): this
+    // example never detects a fault on either, so it is always "no-fault-detected".
+    if (propertyIdentifier == PROPERTY_IDENTIFIER_RELIABILITY &&
+        ((objectType == OBJECT_TYPE_SCHEDULE && objectInstance == SCHEDULE_INSTANCE) ||
+         (objectType == OBJECT_TYPE_CALENDAR && objectInstance == CALENDAR_INSTANCE))) {
+        *value = RELIABILITY_NO_FAULT_DETECTED;
+        return true;
     }
     if (objectType == OBJECT_TYPE_BINARY_INPUT &&
         objectInstance == BINARY_INPUT_INSTANCE) {
@@ -442,7 +506,8 @@ bool GetPropertyEnumerated(const uint32_t deviceInstance, const uint16_t objectT
 bool GetPropertyUnsignedInteger(const uint32_t deviceInstance, const uint16_t objectType,
                                 const uint32_t objectInstance, const uint32_t propertyIdentifier,
                                 uint32_t* value, const bool useArrayIndex,
-                                const uint32_t propertyArrayIndex) {
+                                const uint32_t propertyArrayIndex, uint32_t* errorCode) {
+    (void)errorCode;
     if (deviceInstance != g_deviceInstance) {
         return false;
     }
@@ -516,9 +581,20 @@ bool GetPropertyUnsignedInteger(const uint32_t deviceInstance, const uint16_t ob
 bool GetPropertyBool(const uint32_t deviceInstance, const uint16_t objectType,
                      const uint32_t objectInstance, const uint32_t propertyIdentifier,
                      bool* value, const bool useArrayIndex,
-                     const uint32_t propertyArrayIndex) {
+                     const uint32_t propertyArrayIndex, uint32_t* errorCode) {
+    (void)errorCode;
     if (deviceInstance != g_deviceInstance) {
         return false;
+    }
+    // Calendar 1 (Cream) Present_Value (required): true when today's date is in
+    // Date_List. This example cannot populate a Calendar object's Date_List
+    // through the customer API (cas-bacnet-stack issue #963 - see TODO.md), so
+    // there is nothing to evaluate against; always answer false rather than
+    // fabricate a match.
+    if (objectType == OBJECT_TYPE_CALENDAR && objectInstance == CALENDAR_INSTANCE &&
+        propertyIdentifier == PROPERTY_IDENTIFIER_PRESENT_VALUE) {
+        *value = false;
+        return true;
     }
     // Commandable outputs: the stack asks "is this Priority_Array slot null?" with
     // the boolean getter. Answer true (1) for a relinquished slot, false (0) for a
@@ -541,7 +617,9 @@ bool GetPropertyBool(const uint32_t deviceInstance, const uint16_t objectType,
          objectType == OBJECT_TYPE_BINARY_OUTPUT ||
          objectType == OBJECT_TYPE_MULTI_STATE_OUTPUT ||
          objectType == OBJECT_TYPE_ANALOG_VALUE ||
-         objectType == OBJECT_TYPE_NETWORK_PORT)) {
+         objectType == OBJECT_TYPE_NETWORK_PORT ||
+         objectType == OBJECT_TYPE_SCHEDULE ||
+         objectType == OBJECT_TYPE_CALENDAR)) {
         *value = false;
         return true;
     }
@@ -556,8 +634,9 @@ bool GetPropertyOctetString(const uint32_t deviceInstance, const uint16_t object
                             const uint32_t objectInstance, const uint32_t propertyIdentifier,
                             uint8_t* value, uint32_t* valueElementCount,
                             const uint32_t maxElementCount, const bool useArrayIndex,
-                            const uint32_t propertyArrayIndex) {
+                            const uint32_t propertyArrayIndex, uint32_t* errorCode) {
     (void)useArrayIndex;
+    (void)errorCode;
     (void)propertyArrayIndex;
     if (deviceInstance != g_deviceInstance ||
         objectType != OBJECT_TYPE_NETWORK_PORT ||
@@ -606,7 +685,8 @@ bool GetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectT
                            const uint32_t objectInstance, const uint32_t propertyIdentifier,
                            char* value, uint32_t* valueElementCount,
                            const uint32_t maxElementCount, uint8_t* encodingType,
-                           const bool useArrayIndex, const uint32_t propertyArrayIndex) {
+                           const bool useArrayIndex, const uint32_t propertyArrayIndex,
+                           uint32_t* errorCode) {
     if (deviceInstance != g_deviceInstance) {
         return false;
     }
@@ -622,6 +702,11 @@ bool GetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectT
             return ReturnCharacterString(stateText[propertyArrayIndex - 1], value,
                                          valueElementCount, maxElementCount, encodingType);
         }
+        // The one place in this file where naming an error is clearly right: the
+        // client asked for State_Text[n] and this object has no element n. That
+        // is not "no opinion" - it is a wrong read, and the spec has a code for
+        // it. Without this the client would silently receive an empty string.
+        *errorCode = ERROR_CODE_INVALID_ARRAY_INDEX;
         return false;
     }
 
@@ -656,6 +741,12 @@ bool GetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectT
         }
         if (objectType == OBJECT_TYPE_NETWORK_PORT && objectInstance == NETWORK_PORT_INSTANCE) {
             return ReturnCharacterString("Vermilion", value, valueElementCount, maxElementCount, encodingType);
+        }
+        if (objectType == OBJECT_TYPE_SCHEDULE && objectInstance == SCHEDULE_INSTANCE) {
+            return ReturnCharacterString("Saffron", value, valueElementCount, maxElementCount, encodingType);
+        }
+        if (objectType == OBJECT_TYPE_CALENDAR && objectInstance == CALENDAR_INSTANCE) {
+            return ReturnCharacterString("Cream", value, valueElementCount, maxElementCount, encodingType);
         }
     }
 
@@ -1105,6 +1196,10 @@ int main(int argc, char** argv) {
     }
 
     // --- Register callbacks -------------------------------------------------
+    // Tell the helper which Network Port object owns the socket it just bound.
+    // The stack identifies a link by its Network Port INSTANCE, so the transport
+    // callbacks (and the start-up I-Am) have to name the one added below.
+    CASExampleHelper::SetNetworkPortInstance(NETWORK_PORT_INSTANCE);
     // The transport + time callbacks are shared boilerplate.
     CASExampleHelper::RegisterCommonCallbacks();
     // The property callbacks are specific to this example.
@@ -1218,7 +1313,7 @@ int main(int argc, char** argv) {
     // networkNumber 0 with quality "unknown" describes a local port that has not
     // learned its network number - the right answer for a device that is not a
     // router and has not been told one.
-    if (!BACnetStack_AddNetworkPortObjectWithNetworkNumber(
+    if (!BACnetStack_AddNetworkPortObject(
             g_deviceInstance, NETWORK_PORT_INSTANCE,
             NETWORK_PORT_NETWORK_TYPE_IPV4,
             NETWORK_PORT_PROTOCOL_LEVEL_BACNET_APPLICATION,
@@ -1367,6 +1462,19 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // AE-CRL-B: make Jade's Recipient_List WRITABLE so a management station can
+    // redirect it at run time (135-2024 12.21.28 requires this to be writable on a
+    // B-AAC). The stack decodes and stores the written BACnetDestination list
+    // itself - this is a constructed, stack-generated property, so nothing here
+    // needs a Set callback. A device-instance recipient written this way is
+    // resolved the same DAB/Who-Is way as one seeded above (see the comment on
+    // RECIPIENT_PROCESS_IDENTIFIER).
+    if (!BACnetStack_SetPropertyWritable(g_deviceInstance, OBJECT_TYPE_NOTIFICATION_CLASS,
+                                         NOTIFICATION_CLASS_INSTANCE, PROPERTY_IDENTIFIER_RECIPIENT_LIST, true)) {
+        printf("Error: could not make Notification Class 1 (Jade) Recipient_List writable.\n");
+        return 1;
+    }
+
     // 5) Give Diamond an OutOfRange event algorithm: NORMAL while
     //    LOW_LIMIT <= Present_Value <= HIGH_LIMIT, else OFFNORMAL. The deadband
     //    is the hysteresis applied when returning to normal.
@@ -1379,6 +1487,76 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // --- SCHED-I-B: Schedule 1 (Saffron) + Calendar 1 (Cream) ----------------
+    // Saffron writes Chartreuse's (Analog Output 1) Present_Value at
+    // SCHEDULE_WRITE_PRIORITY whenever a Weekly_Schedule or Exception_Schedule
+    // entry is active; Schedule_Default applies the rest of the time.
+    if (!BACnetStack_AddObject(g_deviceInstance, OBJECT_TYPE_SCHEDULE, SCHEDULE_INSTANCE)) {
+        printf("Error: Failed to add Schedule 1 (Saffron).\n");
+        return 1;
+    }
+    if (!BACnetStack_AddObject(g_deviceInstance, OBJECT_TYPE_CALENDAR, CALENDAR_INSTANCE)) {
+        printf("Error: Failed to add Calendar 1 (Cream).\n");
+        return 1;
+    }
+    if (!BACnetStack_AddScheduleObject(g_deviceInstance, SCHEDULE_INSTANCE)) {
+        printf("Error: Failed to create the stack-held schedule data for Saffron.\n");
+        return 1;
+    }
+    // Target: Analog Output 1 (Chartreuse) Present_Value, on this device.
+    if (!BACnetStack_AddScheduleObjectPropertyReference(
+            g_deviceInstance, SCHEDULE_INSTANCE,
+            g_deviceInstance, OBJECT_TYPE_ANALOG_OUTPUT, ANALOG_OUTPUT_INSTANCE,
+            PROPERTY_IDENTIFIER_PRESENT_VALUE, false, 0)) {
+        printf("Error: Failed to point Saffron at Analog Output 1 (Chartreuse).\n");
+        return 1;
+    }
+    if (!BACnetStack_SetSchedulePriorityForWriting(g_deviceInstance, SCHEDULE_INSTANCE, SCHEDULE_WRITE_PRIORITY)) {
+        printf("Error: Failed to set Saffron's Priority_For_Writing.\n");
+        return 1;
+    }
+    if (!BACnetStack_SetScheduleDefault(g_deviceInstance, SCHEDULE_INSTANCE,
+                                        4 /*Real*/, 0, SCHEDULE_DEFAULT_VALUE)) {
+        printf("Error: Failed to set Saffron's Schedule_Default.\n");
+        return 1;
+    }
+    // Effective for the current calendar year - a wide, obviously-safe window for
+    // a demo device; a real deployment would set the actual commissioning period.
+    if (!BACnetStack_SetScheduleEffectivePeriod(g_deviceInstance, SCHEDULE_INSTANCE,
+                                                0, 1, 1, 0, 12, 31)) {
+        printf("Error: Failed to set Saffron's Effective_Period.\n");
+        return 1;
+    }
+    // One weekly transition: every Monday at 08:00, Chartreuse moves to the demo
+    // value. (Weekly_Schedule day order is 0=Monday..6=Sunday - see
+    // BACnetStack_AddScheduleWeeklyTimeValue's doc comment - NOT C's tm_wday.)
+    if (!BACnetStack_AddScheduleWeeklyTimeValue(g_deviceInstance, SCHEDULE_INSTANCE,
+                                                0 /*Monday*/, 8, 0, 0, 0,
+                                                4 /*Real*/, 0, SCHEDULE_DEMO_VALUE)) {
+        printf("Error: Failed to add Saffron's weekly Monday 08:00 transition.\n");
+        return 1;
+    }
+    // One exception: an inline calendar-date entry (periodType 0 = a single date,
+    // here 2026-12-25) rather than a reference to Cream's Date_List - Cream's
+    // Date_List cannot be populated through the customer API yet (issue #963;
+    // see TODO.md), so a calendar-REFERENCE exception would be stored but would
+    // never actually match. The inline form has no such dependency.
+    uint32_t exceptionIndex = 0;
+    if (!BACnetStack_AddScheduleExceptionEventWithCalendarEntry(
+            g_deviceInstance, SCHEDULE_INSTANCE, 0 /*periodType: calendar Date*/,
+            2026, 12, 25, 255 /*wd1: any*/,
+            0, 255, 255, 255 /*y2/m2/d2/wd2: unused for periodType 0*/,
+            1 /*eventPriority: highest*/, &exceptionIndex)) {
+        printf("Error: Failed to add Saffron's 2026-12-25 exception event.\n");
+        return 1;
+    }
+    if (!BACnetStack_AddScheduleExceptionTimeValue(g_deviceInstance, SCHEDULE_INSTANCE,
+                                                   exceptionIndex, 0, 0, 0, 0,
+                                                   4 /*Real*/, 0, SCHEDULE_EXCEPTION_VALUE)) {
+        printf("Error: Failed to add Saffron's 2026-12-25 exception time-value.\n");
+        return 1;
+    }
+
     // Who-Is is answered automatically. The spec also requires a device to
     // announce itself on start-up, so broadcast an unsolicited I-Am now (to the
     // local subnet broadcast - the Network Port's own network).
@@ -1388,7 +1566,7 @@ int main(int argc, char** argv) {
     // a Who-Is on start-up - every device on the subnet answers with its I-Am.
     uint8_t broadcastConn[6];
     LocalBroadcastConnString(broadcastConn);
-    BACnetStack_SendWhoIs(broadcastConn, sizeof(broadcastConn), NETWORK_TYPE_IP,
+    BACnetStack_SendWhoIs(broadcastConn, sizeof(broadcastConn), NETWORK_PORT_INSTANCE,
                           true /*broadcast*/, 0, NULL, 0);
 
     printf("FYI: Device %u (\"%s\") ready. Vendor ID %u. Press 'h' for help.\n",
@@ -1457,6 +1635,38 @@ int main(int argc, char** argv) {
                 g_analogInput1Value -= 1.1f;
                 printf("Analog Input 1 (Bronze) = %.1f C\n", g_analogInput1Value);
                 break;
+            case CASExampleHelper::KeyCommand::DemoAdvance: {
+                // SCHED-I-B demo: add a Weekly_Schedule transition for RIGHT NOW
+                // (today, current h:m:s) instead of waiting for the pre-seeded
+                // Monday 08:00 entry. The schedule engine evaluates Weekly_Schedule
+                // against wall-clock time on every tick, so once this entry exists
+                // it is immediately the latest transition today and Chartreuse
+                // (Analog Output 1) moves to SCHEDULE_DEMO_VALUE at
+                // SCHEDULE_WRITE_PRIORITY on the next tick.
+                time_t now = time(NULL);
+                struct tm nowTm;
+#if defined(_WIN32)
+                localtime_s(&nowTm, &now);
+#else
+                localtime_r(&now, &nowTm);
+#endif
+                // BACnetDailySchedule day order is 0=Monday..6=Sunday; tm_wday is
+                // 0=Sunday..6=Saturday, so shift it.
+                const uint8_t dayOffset = (uint8_t)((nowTm.tm_wday + 6) % 7);
+                if (BACnetStack_AddScheduleWeeklyTimeValue(
+                        g_deviceInstance, SCHEDULE_INSTANCE, dayOffset,
+                        (uint8_t)nowTm.tm_hour, (uint8_t)nowTm.tm_min, (uint8_t)nowTm.tm_sec, 0,
+                        4 /*Real*/, 0, SCHEDULE_DEMO_VALUE)) {
+                    printf("Schedule 1 (Saffron): added a Weekly_Schedule entry for right now "
+                           "(%02u:%02u:%02u) -> Analog Output 1 (Chartreuse) moves to %.1f at "
+                           "priority %u on the next tick.\n",
+                           nowTm.tm_hour, nowTm.tm_min, nowTm.tm_sec,
+                           SCHEDULE_DEMO_VALUE, SCHEDULE_WRITE_PRIORITY);
+                } else {
+                    printf("Error: could not add the demo Weekly_Schedule entry.\n");
+                }
+                break;
+            }
             case CASExampleHelper::KeyCommand::None:
             default:
                 break;
