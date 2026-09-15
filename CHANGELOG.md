@@ -5,13 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - unreleased
+## [1.2.0] - unreleased
 
 > Not tagged yet: `v1.0.0` is the only tag in this repository. `release.yml` publishes binaries on a `v*.*.*`
 > tag, so until that tag exists this section describes what is on the
 > branch, not what shipped.
 
+### Added
+
+- **SCHED-I-B: internal scheduling.** Schedule 1 "Saffron" writes Analog Output 1
+  "Chartreuse" `Present_Value` at priority 8, driven by one weekly transition
+  (Monday 08:00) and one calendar-date exception (2026-12-25, via
+  `BACnetStack_AddScheduleExceptionEventWithCalendarEntry`). Calendar 1 "Cream"
+  is added alongside the exception; its `Date_List` cannot be populated through
+  the customer API yet (cas-bacnet-stack issue #963 - see `TODO.md`), so the
+  exception uses the inline calendar-date form rather than a reference to Cream.
+  The `s` key (`common/` 2.1.0's new `KeyCommand::DemoAdvance`) adds a
+  `Weekly_Schedule` transition for right now, so the schedule's effect can be
+  observed without waiting for the wall clock to reach a seeded time.
+- **AE-CRL-B: writable `Recipient_List`.** Notification Class 1 "Jade"'s
+  `Recipient_List` is now registered writable
+  (`BACnetStack_SetPropertyWritable`); the stack decodes and stores a
+  `WriteProperty` to it itself, and a device-instance recipient written this way
+  is resolved via the stack's Device-Address-Binding cache the same way a
+  host-seeded one is (cas-bacnet-stack issue #1328).
+
 ### Changed
+
+- **`BACnetStack_SetAlarmsAndEventsForObjectEnabled`'s trailing `enabled`
+  argument lost its `= true` default in the 6.x interface freeze**; the call
+  arming Diamond's alarms now passes it explicitly.
+- **`BACnetStack_SendWhoIs`'s `networkType` parameter became
+  `networkPortInstance`** (a `uint32_t`); the start-up Who-Is now passes
+  `NETWORK_PORT_INSTANCE`.
+- **`BACnetStack_AddNetworkPortObjectWithNetworkNumber` is gone**, folded into
+  `BACnetStack_AddNetworkPortObject`, which now always takes the network number
+  and quality.
+- **Every `GetProperty*` callback gained a trailing `uint32_t* errorCode`**
+  (cas-bacnet-stack issue #974). Used in exactly one place - State_Text with an
+  out-of-range array index now answers `Error(property, invalid-array-index)`
+  instead of an empty string - and deliberately left alone on every catch-all
+  `return false`, because the decline-and-fabricate fallback is what answers
+  required properties this application does not serve.
+- Links are identified by Network Port object instance, not network type
+  (#822/#556): handled inside `common/`, with a new
+  `CASExampleHelper::SetNetworkPortInstance()` call added before
+  `RegisterCommonCallbacks()`.
+- `BACnetStack_AddRecipientToNotificationClass`, `RegisterCallbackAcknowledgeAlarm`
+  and `RegisterCallbackSetSystemTime` had parameter renames only
+  (`hundreth`→`hundredth`, `acknowledgement`→`acknowledgment`,
+  `year`→`yearMinus1900`); no code change required at these call sites.
+- Stack pinned to `6.x` @ `abd4cee1` (reports 6.0.21).
+- **Now links the CAS BACnet Stack as a prebuilt STATIC library**
+  (`CAS_BACNET_STACK_LINK=STATIC`), built first by `tools/build-stack-static.sh`
+  from the stack's own project files. SOURCE and DLL modes remain available in
+  the adapter but this example is built and published in STATIC mode only.
+- `common/` bumped to **v2.1.0** (see `common/CHANGELOG.md`), byte-identical to
+  the other migrated examples; adds `KeyCommand::DemoAdvance` (key `s`).
+
+### Changed (from the earlier unreleased work, folded into this release)
 
 - **Links the CAS BACnet Stack through the `CASBACnetStack::Adapter` CMake target
   instead of compiling its `source/*.cpp` into this project directly.** `main.cpp`

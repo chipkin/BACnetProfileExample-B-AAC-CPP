@@ -7,14 +7,15 @@ Guidance for AI coding agents working in this repository. See
 ## What this project is
 
 A **tutorial** C++ example that implements **as much of** the BACnet **B-AAC
-(Advanced Application Controller)** profile as the standard CAS BACnet Stack DLL
+(Advanced Application Controller)** profile as the standard CAS BACnet Stack
 supports. It is one of a series - one git repo per BACnet profile - and builds on
 B-ASC by adding ReadPropertyMultiple/WritePropertyMultiple, **intrinsic alarming**
-(AE-N-I-B / AE-ACK-B / AE-INFO-B), time synchronisation, and ReinitializeDevice.
-What B-AAC requires but the stack cannot yet do (notably SCHED-I-B internal
-scheduling) is documented in [TODO.md](TODO.md) - keep that file honest and current.
-The top priority is that the code reads like a tutorial a customer can learn from
-and copy-paste. Favour clarity over cleverness.
+(AE-N-I-B / AE-ACK-B / AE-INFO-B / AE-CRL-B), **internal scheduling** (SCHED-I-B),
+time synchronisation, and ReinitializeDevice. What B-AAC requires but the stack
+cannot yet do (a Calendar object's `Date_List`) is documented in
+[TODO.md](TODO.md) - keep that file honest and current. The top priority is that
+the code reads like a tutorial a customer can learn from and copy-paste. Favour
+clarity over cleverness.
 
 ## Layout
 
@@ -28,15 +29,20 @@ This repository is self-contained:
 
 ## Build
 
+This example links the CAS BACnet Stack as a prebuilt **STATIC** library (the
+only mode it ships in - see the README's "Link mode" section):
+
 ```bash
 git submodule update --init --recursive   # once, if not cloned with --recursive
-cmake -B build -S .
+tools/build-stack-static.sh BACnetProfileExample-B-AAC-CPP   # from the series root
+cmake -B build -S . -DCAS_BACNET_STACK_LINK=STATIC
 cmake --build build --config Release
 ```
 
-The first build compiles the whole stack (~600 files) and takes a few minutes;
-later incremental builds are fast. Use `-D CAS_STACK_DIR=...` only if your stack
-lives outside the bundled submodule.
+The stack library build takes a few minutes the first time - it compiles the
+whole stack (~600 files) once, via the stack's own project files; the example
+itself then builds in seconds against that library. Use `-D CAS_STACK_DIR=...`
+only if your stack lives outside the bundled submodule.
 
 ## Run
 
@@ -45,7 +51,8 @@ lives outside the bundled submodule.
 .\build\Release\BACnetExampleBAAC.exe [--port 47808] [--deviceID 389004]   # Windows
 ```
 
-Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1.
+Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1,
+`s` advance Schedule 1 (Saffron) to a transition right now.
 
 ## Conventions
 
@@ -55,10 +62,21 @@ Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1
   is NOT implemented must be listed in [TODO.md](TODO.md) and the README.
 - Intrinsic alarming: arm an object with `SetIntrinsic*Algorithm` + a Notification
   Class (`AddNotificationClassObject` + `AddRecipientToNotificationClass`) +
-  `SetAlarmsAndEventsForObjectEnabled`. Drive the monitored Present_Value and call
-  `BACnetStack_UpdateValue` so the stack re-evaluates and fires the notification.
-  The recipient must be addressed by ADDRESS (the device-instance form is not
-  implemented by the standard stack's notification sender).
+  `SetAlarmsAndEventsForObjectEnabled(..., true)` (6.x dropped that trailing
+  argument's default - pass it explicitly). Drive the monitored Present_Value and
+  call `BACnetStack_UpdateValue` so the stack re-evaluates and fires the
+  notification. A recipient can be seeded by ADDRESS or by DEVICE instance; either
+  way, register `Recipient_List` writable (`SetPropertyWritable`, AE-CRL-B) so a
+  client can redirect it at run time - the stack decodes and stores the write, and
+  resolves a device-instance recipient via its Device-Address-Binding cache.
+- SCHED-I-B: `BACnetStack_AddScheduleObject` + `AddScheduleObjectPropertyReference`
+  + `AddScheduleWeeklyTimeValue` / `SetScheduleDefault` /
+  `SetScheduleEffectivePeriod` / `SetSchedulePriorityForWriting` create and drive a
+  Schedule; the stack's engine evaluates it against wall-clock time and writes the
+  referenced property at the configured priority. Prefer
+  `AddScheduleExceptionEventWithCalendarEntry` (inline date) over
+  `...WithCalendarReference` (a Calendar object) - the latter does not currently
+  evaluate the Calendar's `Date_List` (issue #963).
 - Outputs are **commandable**: store the 16-slot `Priority_Array` +
   `Relinquish_Default` in the app (the `Commandable` struct); let the stack
   resolve `Present_Value`. Writes land via the `SetProperty*` callbacks (value)
@@ -90,7 +108,14 @@ There are no unit tests; verification is behavioural:
 5. **Alarming**: WriteProperty Analog Value 1 "Diamond" `Present_Value` above the
    high limit; confirm `Event_State` goes to `high-limit` and an EventNotification
    is sent (check the device log / a listener); write it back and confirm `NORMAL`.
-6. **Device management**: ReinitializeDevice WARMSTART SimpleACKs; DCC
+   AcknowledgeAlarm and GetEventInformation both respond.
+6. **AE-CRL-B**: WriteProperty Notification Class 1 "Jade" `Recipient_List` with a
+   new destination; fire another alarm and confirm it reaches the new recipient.
+7. **SCHED-I-B**: read Schedule 1 "Saffron"'s `Weekly_Schedule` /
+   `Effective_Period` / `Schedule_Default`; press `s` (or wait for the seeded
+   Monday 08:00 transition) and confirm Analog Output 1 "Chartreuse"
+   `Present_Value` changes and `Priority_Array[8]` shows the write.
+8. **Device management**: ReinitializeDevice WARMSTART SimpleACKs; DCC
    `disable-initiation`/`enable` SimpleACK; a wrong password (if set) is rejected.
 
 Verification is manual (no in-repo test suite ships). During development a
