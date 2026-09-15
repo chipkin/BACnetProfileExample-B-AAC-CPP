@@ -567,7 +567,10 @@ run (`metrics-windows.json` / `metrics-linux.json`), both built with
 <!-- METRICS -->
 | Platform | Binary | Size | SHA-256 (prefix) | Start-up to `ready` | Stack commit | Link mode | Compiler |
 |---|---|---|---|---|---|---|---|
-| - | - | not yet released at this pin/link mode | - | - | `abd4cee1` | STATIC | - |
+| Windows x64 (windows-2022) | `BACnetExampleBAAC.exe` | 3,408,896 bytes (~3.3 MiB) | `a644869f07562ba4` | 74 ms | `abd4cee1` | STATIC | Visual Studio 17 2022 |
+| Linux x64 (ubuntu-latest) | `BACnetExampleBAAC` | 49,720 bytes (~49 KiB) | `9e4209f24cb7c5b0` | 108 ms | `abd4cee1` | STATIC | `/usr/bin/c++` |
+
+From release [v1.2.0](https://github.com/chipkin/BACnetProfileExample-B-AAC-CPP/releases/tag/v1.2.0) (`metrics-windows.json` / `metrics-linux.json`).
 
 ## References
 
