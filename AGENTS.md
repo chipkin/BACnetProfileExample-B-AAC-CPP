@@ -2,7 +2,7 @@
 
 Guidance for AI coding agents working in this repository. See
 <https://agents.md/> for the format. Human contributors should read
-[README.md](README.md) first.
+[README.md](README.md) first, then [TUTORIAL.md](TUTORIAL.md).
 
 ## What this project is
 
@@ -23,26 +23,41 @@ This repository is self-contained:
 
 - `main.cpp` - the example device.
 - `common/` - the shared helper (vendored).
+- `README.md` - what this example is. Keep it short and about THIS example only.
+- `TUTORIAL.md` - how to extend and review the example. Long-form material that
+  would bloat the README belongs here.
+- `docs/PICS.md` - the Protocol Implementation Conformance Statement. Its
+  objects-and-properties section is GENERATED from `docs/objects.json`; do not
+  hand-edit between the `OBJECTS-PROPERTIES` markers.
+- `docs/objects.json` - the input to that generator. Update it in the same change
+  as any `main.cpp` change that adds an object or a `GetProperty*` branch.
+- `TODO.md` - what B-AAC requires that this example does not yet do, and why.
+  Keep this current when the stack's capability changes.
 - `submodules/cas-bacnet-stack/` - the **CAS BACnet Stack** as a git submodule
   (private; compiled from source). After cloning, run
   `git submodule update --init --recursive`.
 
+The `PROFILE-TABLE` block in README.md is also generated, from the example-series
+repository's `docs/profile-table.md`. Edit it there, not here.
+
 ## Build
 
-This example links the CAS BACnet Stack as a prebuilt **STATIC** library (the
-only mode it ships in - see the README's "Link mode" section):
+Plain CMake, identical on every platform, in the adapter's default SOURCE mode
+(the stack's sources are compiled into the executable - no prebuilt library, no
+DLL, no per-platform pre-step):
 
 ```bash
 git submodule update --init --recursive   # once, if not cloned with --recursive
-tools/build-stack-static.sh BACnetProfileExample-B-AAC-CPP   # from the series root
-cmake -B build -S . -DCAS_BACNET_STACK_LINK=STATIC
+cmake -B build -S .
 cmake --build build --config Release
 ```
 
-The stack library build takes a few minutes the first time - it compiles the
-whole stack (~600 files) once, via the stack's own project files; the example
-itself then builds in seconds against that library. Use `-D CAS_STACK_DIR=...`
-only if your stack lives outside the bundled submodule.
+The first build compiles the whole stack (~600 files) and takes a few minutes;
+rebuilds after that are incremental and fast. Use `-D CAS_STACK_DIR=...` only if
+your stack lives outside the bundled submodule. Do not reintroduce a link-mode
+flag or a series-root build script into the documented build: a customer
+downloads this repository on its own and must be able to build it with the two
+commands above.
 
 ## Run
 
@@ -52,7 +67,7 @@ only if your stack lives outside the bundled submodule.
 ```
 
 Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1,
-`s` advance Schedule 1 (Saffron) to a transition right now.
+`s` advance Schedule 1 "Saffron" to a transition right now.
 
 ## Conventions
 
@@ -85,6 +100,8 @@ Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1
   machine; the `DeviceCommunicationControl` callback just validates `DCC_PASSWORD`
   and logs. The deprecated plain `disable` (1) is rejected by the stack at
   Protocol_Revision >= 20 - only `enable` (0) and `disable-initiation` (2) apply.
+- ReinitializeDevice (DM-RD-B): accept-and-defer, never restart in the callback -
+  see [docs/deferred-restart-adoption.md](docs/deferred-restart-adoption.md).
 - Match the surrounding code style: `const`-correct parameters, check every stack
   return value, keep `main.cpp` linear and well-commented.
 - **Never edit `common/` in this repo alone** - it is a vendored copy shared by
@@ -117,6 +134,9 @@ There are no unit tests; verification is behavioural:
    `Present_Value` changes and `Priority_Array[8]` shows the write.
 8. **Device management**: ReinitializeDevice WARMSTART SimpleACKs; DCC
    `disable-initiation`/`enable` SimpleACK; a wrong password (if set) is rejected.
+9. If you changed the objects or their properties, regenerate `docs/PICS.md`
+   (`python tools/gen-objects-properties.py BACnetProfileExample-B-AAC-CPP` from
+   the series root) and confirm no row comes out flagged with ⚠.
 
 Verification is manual (no in-repo test suite ships). During development a
 raw-socket smoke script was used against a running instance on a clear `--port`
@@ -129,6 +149,5 @@ then tag `vX.Y.Z`. The GitHub Actions workflow builds and publishes the release.
 
 ## License
 
-The example source code is dedicated to the public domain under
-[CC0-1.0](LICENSE). The CAS BACnet Stack is a separate, commercially licensed
-product and is not covered by that dedication.
+See [LICENSE](LICENSE). The CAS BACnet Stack is a separate, commercially
+licensed product and is not covered by it.

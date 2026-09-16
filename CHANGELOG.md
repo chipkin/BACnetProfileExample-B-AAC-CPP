@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Restructured the documentation**: `README.md` is cut down to what this
+  example is and how to build/run/verify it; the "Before you ship" table, the
+  "Extending the example" material (who-serves-what, adding an object) and the
+  full objects-and-properties table moved to a new **TUTORIAL.md**; the
+  standalone Protocol Implementation Conformance Statement moved to a new
+  **docs/PICS.md** (ANSI/ASHRAE 135 Annex A shape). `docs/objects.json` gained a
+  `Device` entry (previously the generated tables omitted the Device object
+  entirely) so the PICS's objects-and-properties section now covers all twelve
+  objects, not eleven.
+- **Build switched from a prebuilt STATIC library to the adapter's default
+  SOURCE mode**: `cmake -B build -S .` / `cmake --build build --config Release`
+  is now the whole documented build, identically on Windows, Linux and macOS -
+  no `tools/build-stack-static.sh` pre-step (that script lives in the
+  example-series repository, not this one, so a customer who only has this
+  repository never had it). `.github/workflows/release.yml` dropped the
+  static-library cache/build steps and the matrix `lib:` entries, configures
+  without a link-mode flag, asserts `CAS_BACNET_STACK_LINK` back out as
+  `SOURCE` instead of `STATIC`, records `"link_mode": "SOURCE"` in the
+  published metrics JSON, and now packages `TUTORIAL.md` and `docs/PICS.md`
+  alongside the binary. The Footprint table's numbers were measured from the
+  old STATIC build; the next release refreshes them from the SOURCE build.
+- `README.md`'s "Versions" callout's `common/` helper version corrected from
+  the stale `v2.1.0` to the `v2.5.0` this repository is actually vendoring
+  (`COMMON_VERSION` in `common/CASExampleHelper.h`).
+
 ## [1.2.0] - 2026-09-15
 
 ### Added
