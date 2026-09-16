@@ -44,7 +44,7 @@
 //     Binary Output 1          "Fuchsia"     (active / inactive; WRITABLE, commandable)
 //     Multi-State Output 1     "Indigo"      (state 1..3; WRITABLE, commandable)
 //     Analog Value 1           "Diamond"     (REAL, WRITABLE; intrinsic OutOfRange alarm)
-//     Notification Class 1     "Jade"        (routes Diamond's alarms; Recipient_List WRITABLE)
+//     Notification Class 1     "Crimson"        (routes Diamond's alarms; Recipient_List WRITABLE)
 //     Network Port 1           "Vermilion"   (the BACnet/IP port - required)
 //     Schedule 1               "Saffron"     (drives Chartreuse on a weekly + exception basis)
 //     Calendar 1               "Cream"       (see TODO.md - Date_List not evaluated)
@@ -56,7 +56,7 @@
 //
 // ALARMING: Analog Value 1 ("Diamond") has an intrinsic OutOfRange event algorithm
 // with a low/high limit. When its Present_Value crosses a limit, the stack sends an
-// UnconfirmedEventNotification to the recipients of Notification Class 1 ("Jade")
+// UnconfirmedEventNotification to the recipients of Notification Class 1 ("Crimson")
 // (unconfirmed + broadcast by default - see the recipient note in main). Drive
 // Diamond out of range with a WriteProperty to its Present_Value to see it.
 //
@@ -194,7 +194,7 @@ static Commandable g_multiStateOutput = { { false }, { 0 }, 1.0 }; // default st
 // --- The alarm-capable Analog Value + its Notification Class (the B-AAC additions)
 // Analog Value 1 "Diamond" carries an intrinsic OutOfRange event algorithm. When
 // its Present_Value leaves [LOW_LIMIT, HIGH_LIMIT] for longer than the time delay,
-// the stack fires an EventNotification to Notification Class 1 "Jade"'s recipients.
+// the stack fires an EventNotification to Notification Class 1 "Crimson"'s recipients.
 static const uint32_t ANALOG_VALUE_INSTANCE = 1;            // "Diamond"
 static float g_analogValue1Value = 50.0f;                  // a process value (%)
 static const float ANALOG_VALUE_LOW_LIMIT = 10.0f;
@@ -202,7 +202,7 @@ static const float ANALOG_VALUE_HIGH_LIMIT = 90.0f;
 static const float ANALOG_VALUE_DEADBAND = 2.0f;           // hysteresis returning to normal
 static const uint32_t ANALOG_VALUE_TIME_DELAY = 0;         // seconds the limit must hold
 
-static const uint32_t NOTIFICATION_CLASS_INSTANCE = 1;     // "Jade"
+static const uint32_t NOTIFICATION_CLASS_INSTANCE = 1;     // "Crimson"
 // Notification priorities for the three transitions (lower = more urgent). The
 // to-fault priority is supplied for completeness, but this example's OutOfRange
 // algorithm has no fault source, so to-fault is left disabled below.
@@ -734,7 +734,7 @@ bool GetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectT
             return ReturnCharacterString("Diamond", value, valueElementCount, maxElementCount, encodingType);
         }
         if (objectType == OBJECT_TYPE_NOTIFICATION_CLASS && objectInstance == NOTIFICATION_CLASS_INSTANCE) {
-            return ReturnCharacterString("Jade", value, valueElementCount, maxElementCount, encodingType);
+            return ReturnCharacterString("Crimson", value, valueElementCount, maxElementCount, encodingType);
         }
         if (objectType == OBJECT_TYPE_MULTI_STATE_OUTPUT && objectInstance == MULTI_STATE_OUTPUT_INSTANCE) {
             return ReturnCharacterString("Indigo", value, valueElementCount, maxElementCount, encodingType);
@@ -1412,17 +1412,17 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // 2) Create Notification Class 1 "Jade" - it holds the recipient list and the
+    // 2) Create Notification Class 1 "Crimson" - it holds the recipient list and the
     //    notification priority for each transition (to-offnormal / to-fault / to-normal).
     if (!BACnetStack_AddNotificationClassObject(
             g_deviceInstance, NOTIFICATION_CLASS_INSTANCE,
             NC_PRIORITY_TO_OFFNORMAL, NC_PRIORITY_TO_FAULT, NC_PRIORITY_TO_NORMAL,
             true /*toOffNormalAckRequired*/, false /*toFaultAck*/, true /*toNormalAck*/)) {
-        printf("Error: Failed to add Notification Class 1 (Jade).\n");
+        printf("Error: Failed to add Notification Class 1 (Crimson).\n");
         return 1;
     }
 
-    // 3) Add a recipient to Jade - WHERE the alarm notifications go. We address it
+    // 3) Add a recipient to Crimson - WHERE the alarm notifications go. We address it
     //    by ADDRESS (the form the stack can actually send to). The MAC is the
     //    BACnet/IP recipient: four IP octets followed by the two-octet UDP port.
     //    validDays 0x7F = every day; the time window 00:00:00 - 23:59:59 = always.
@@ -1447,11 +1447,11 @@ int main(int argc, char** argv) {
             true,               // use the ADDRESS choice
             0,                  // network number 0 = this local network
             recipientMac, sizeof(recipientMac))) {
-        printf("Error: could not seed the Notification Class recipient (Jade).\n");
+        printf("Error: could not seed the Notification Class recipient (Crimson).\n");
         return 1;
     }
 
-    // 4) Turn on intrinsic event reporting for Diamond, routed through Jade.
+    // 4) Turn on intrinsic event reporting for Diamond, routed through Crimson.
     if (!BACnetStack_SetAlarmsAndEventsForObjectEnabled(
             g_deviceInstance, OBJECT_TYPE_ANALOG_VALUE, ANALOG_VALUE_INSTANCE,
             NOTIFICATION_CLASS_INSTANCE, NOTIFY_TYPE_ALARM,
@@ -1462,7 +1462,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // AE-CRL-B: make Jade's Recipient_List WRITABLE so a management station can
+    // AE-CRL-B: make Crimson's Recipient_List WRITABLE so a management station can
     // redirect it at run time (135-2024 12.21.28 requires this to be writable on a
     // B-AAC). The stack decodes and stores the written BACnetDestination list
     // itself - this is a constructed, stack-generated property, so nothing here
@@ -1471,7 +1471,7 @@ int main(int argc, char** argv) {
     // RECIPIENT_PROCESS_IDENTIFIER).
     if (!BACnetStack_SetPropertyWritable(g_deviceInstance, OBJECT_TYPE_NOTIFICATION_CLASS,
                                          NOTIFICATION_CLASS_INSTANCE, PROPERTY_IDENTIFIER_RECIPIENT_LIST, true)) {
-        printf("Error: could not make Notification Class 1 (Jade) Recipient_List writable.\n");
+        printf("Error: could not make Notification Class 1 (Crimson) Recipient_List writable.\n");
         return 1;
     }
 

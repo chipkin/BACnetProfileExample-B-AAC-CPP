@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The `s` key (`common/` 2.1.0's new `KeyCommand::DemoAdvance`) adds a
   `Weekly_Schedule` transition for right now, so the schedule's effect can be
   observed without waiting for the wall clock to reach a seeded time.
-- **AE-CRL-B: writable `Recipient_List`.** Notification Class 1 "Jade"'s
+- **AE-CRL-B: writable `Recipient_List`.** Notification Class 1 "Crimson"'s
   `Recipient_List` is now registered writable
   (`BACnetStack_SetPropertyWritable`); the stack decodes and stores a
   `WriteProperty` to it itself, and a device-instance recipient written this way
@@ -105,7 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Intrinsic alarming (AE-N-I-B):** Analog Value 1 "Diamond" with an OutOfRange
   event algorithm (low/high limit + deadband). Crossing a limit transitions
   `Event_State` and the stack emits an EventNotification.
-- **Notification Class 1 "Jade"** with a seeded recipient (AE-CRL-B, partial). The
+- **Notification Class 1 "Crimson"** with a seeded recipient (AE-CRL-B, partial). The
   recipient is addressed by BACnet/IP address (defaulting to the local subnet
   broadcast) and receives UNCONFIRMED notifications, because the standard stack's
   notification sender requires a recipient address, not a device instance.

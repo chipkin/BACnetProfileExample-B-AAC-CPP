@@ -64,7 +64,7 @@ stack runs, with no external Event Enrollment. This example arms **Analog Value 
 "Diamond"** with an **OutOfRange** algorithm: while its `Present_Value` stays in
 `[10, 90]` the object is `NORMAL`; cross a limit and it transitions to
 `high-limit` / `low-limit` (off-normal). On each transition the stack sends an
-**EventNotification** to the recipients of **Notification Class 1 "Jade"**.
+**EventNotification** to the recipients of **Notification Class 1 "Crimson"**.
 
 Try it: `WriteProperty` Diamond's `Present_Value` to `95` - the device prints the
 write, `Event_State` becomes `high-limit`, and an `UnconfirmedEventNotification`
@@ -72,7 +72,7 @@ goes out to the recipient. Write it back to `50` and it returns to `NORMAL` (a
 second notification). By default the recipient is the **local subnet broadcast**
 (so any client sees the alarm); point it at a specific client in `main.cpp`.
 
-**Redirecting the recipient list (AE-CRL-B).** Notification Class 1 "Jade"'s
+**Redirecting the recipient list (AE-CRL-B).** Notification Class 1 "Crimson"'s
 `Recipient_List` is seeded at start-up **and** registered writable
 (`BACnetStack_SetPropertyWritable`), so a management station can also
 `WriteProperty` a new recipient list at run time - the stack decodes and stores
@@ -117,14 +117,14 @@ Device 389004  "Rainbow"   (Vendor 389 - Chipkin Automation Systems)
     ├── Binary Output 1       "Fuchsia"     writable, commandable (0/1)
     ├── Multi-State Output 1  "Indigo"      writable, commandable (state 1..3)
     ├── Analog Value 1        "Diamond"     writable; intrinsic OutOfRange ALARM
-    ├── Notification Class 1  "Jade"        routes Diamond's alarms to recipients; Recipient_List writable (AE-CRL-B)
+    ├── Notification Class 1  "Crimson"        routes Diamond's alarms to recipients; Recipient_List writable (AE-CRL-B)
     ├── Network Port 1        "Vermilion"   the BACnet/IP port (required)
     ├── Schedule 1             "Saffron"     SCHED-I-B: drives Chartreuse on a weekly schedule + one exception
     └── Calendar 1             "Cream"       exists alongside Saffron's exception (see TODO.md)
 ```
 
 The three inputs are the series' shared minimum; the outputs come from B-SA/B-ASC;
-**Diamond + Jade are the B-AAC alarming additions; Saffron + Cream are the B-AAC
+**Diamond + Crimson are the B-AAC alarming additions; Saffron + Cream are the B-AAC
 scheduling additions**. Object names follow the series' colour convention (Device
 is always "Rainbow").
 
@@ -184,7 +184,7 @@ interesting one in this example:
 | `Property_List` | **stack** | generated |
 | `Status_Flags` | **stack** | generated (and reflects the alarm state) |
 | `Event_State` | **stack** | **computed** - because this example arms an intrinsic OutOfRange algorithm on Diamond (`SetIntrinsicOutOfRangeAlgorithm` + `SetAlarmsAndEventsForObjectEnabled`), the stack drives Event_State to `normal` / `high-limit` / `low-limit`. On an object with **no** alarming, nothing serves Event_State and it reads its datatype default `normal(0)` by coincidence - the opposite situation. |
-| `Notification_Class` | **you** | `GetPropertyUnsignedInteger` - points at Jade (NC 1) |
+| `Notification_Class` | **you** | `GetPropertyUnsignedInteger` - points at Crimson (NC 1) |
 | `Present_Value` | **you** | `GetPropertyReal` |
 | `Object_Name` | **you** | `GetPropertyCharString` |
 | `Units` | **you** | `GetPropertyEnumerated` |
@@ -286,7 +286,7 @@ With the [CAS BACnet Explorer](https://store.chipkin.com/products/tools/cas-bacn
 
 1. **Discover** - Who-Is -> I-Am from `389004` (vendor `389`).
 2. **Object model** - twelve objects incl. Analog Value "Diamond", Notification
-   Class "Jade", Schedule "Saffron" and Calendar "Cream". `Object_List` lists
+   Class "Crimson", Schedule "Saffron" and Calendar "Cream". `Object_List` lists
    them all; `Protocol_Revision` = 24.
 3. **ReadPropertyMultiple** - read several properties of "Diamond" in one request
    (DS-RPM-B).
@@ -296,7 +296,7 @@ With the [CAS BACnet Explorer](https://store.chipkin.com/products/tools/cas-bacn
 5. **Acknowledge** - send AcknowledgeAlarm for Diamond (AE-ACK-B); the device logs
    it. Query active events with GetEventInformation (AE-INFO-B).
 6. **Redirect the recipient list (AE-CRL-B)** - WriteProperty Notification Class 1
-   (Jade) `Recipient_List` with a new destination; fire another alarm and confirm
+   (Crimson) `Recipient_List` with a new destination; fire another alarm and confirm
    it goes to the new recipient instead of the seeded one.
 7. **Scheduling (SCHED-I-B)** - read Schedule 1 (Saffron)'s `Weekly_Schedule`,
    `Effective_Period` and `Schedule_Default`; press `s` at the console (or wait for
@@ -404,7 +404,7 @@ Every object this example creates, and every REQUIRED property of each (per ANSI
 | Relinquish_Default | Unsigned | app | no |
 | Current_Command_Priority | BACnetOptionalUnsigned | stack | no |
 
-### Analog Value 1 "Diamond" - the alarm-capable process value (AE-N-I-B). Event_State is NOT a stack default here - it is genuinely computed, because this example arms an intrinsic OutOfRange algorithm on Diamond (SetIntrinsicOutOfRangeAlgorithm + SetAlarmsAndEventsForObjectEnabled); it is marked accepted only because property-profile-reference.md's generic table does not know an algorithm was armed. A client writes Present_Value across 10-90 percent to fire an EventNotification to Notification Class 1 (Jade)
+### Analog Value 1 "Diamond" - the alarm-capable process value (AE-N-I-B). Event_State is NOT a stack default here - it is genuinely computed, because this example arms an intrinsic OutOfRange algorithm on Diamond (SetIntrinsicOutOfRangeAlgorithm + SetAlarmsAndEventsForObjectEnabled); it is marked accepted only because property-profile-reference.md's generic table does not know an algorithm was armed. A client writes Present_Value across 10-90 percent to fire an EventNotification to Notification Class 1 (Crimson)
 
 | Property | Datatype | Served by | Writable |
 |---|---|---|:---:|
@@ -417,7 +417,7 @@ Every object this example creates, and every REQUIRED property of each (per ANSI
 | Out_Of_Service | Boolean | app | no |
 | Units | BACnetEngineeringUnits | app | no |
 
-### Notification Class 1 "Jade" - AE-CRL-B. Priority, Ack_Required and Recipient_List are NOT stack DEFAULTS - they are genuinely populated, by BACnetStack_AddNotificationClassObject (Priority, Ack_Required) and BACnetStack_AddRecipientToNotificationClass (Recipient_List) at start-up. They are marked accepted only because property-profile-reference.md's generic per-type table does not know about this object-specific host-configuration API and so cannot credit them as stack-served. Recipient_List is also registered writable (BACnetStack_SetPropertyWritable) so a client can redirect it at run time; the stack decodes and stores a WriteProperty to it itself
+### Notification Class 1 "Crimson" - AE-CRL-B. Priority, Ack_Required and Recipient_List are NOT stack DEFAULTS - they are genuinely populated, by BACnetStack_AddNotificationClassObject (Priority, Ack_Required) and BACnetStack_AddRecipientToNotificationClass (Recipient_List) at start-up. They are marked accepted only because property-profile-reference.md's generic per-type table does not know about this object-specific host-configuration API and so cannot credit them as stack-served. Recipient_List is also registered writable (BACnetStack_SetPropertyWritable) so a client can redirect it at run time; the stack decodes and stores a WriteProperty to it itself
 
 | Property | Datatype | Served by | Writable |
 |---|---|---|:---:|
