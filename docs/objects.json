@@ -68,12 +68,12 @@
       "enabled": [],
       "writable": ["Present_Value"],
       "accepted": ["Event_State"],
-      "note": "the alarm-capable process value (AE-N-I-B). Event_State is NOT a stack default here - it is genuinely computed, because this example arms an intrinsic OutOfRange algorithm on Diamond (SetIntrinsicOutOfRangeAlgorithm + SetAlarmsAndEventsForObjectEnabled); it is marked accepted only because property-profile-reference.md's generic table does not know an algorithm was armed. A client writes Present_Value across 10-90 percent to fire an EventNotification to Notification Class 1 (Jade)"
+      "note": "the alarm-capable process value (AE-N-I-B). Event_State is NOT a stack default here - it is genuinely computed, because this example arms an intrinsic OutOfRange algorithm on Diamond (SetIntrinsicOutOfRangeAlgorithm + SetAlarmsAndEventsForObjectEnabled); it is marked accepted only because property-profile-reference.md's generic table does not know an algorithm was armed. A client writes Present_Value across 10-90 percent to fire an EventNotification to Notification Class 1 (Crimson)"
     },
     {
       "type": "Notification Class",
       "instance": 1,
-      "name": "Jade",
+      "name": "Crimson",
       "app": ["Object_Name"],
       "enabled": [],
       "writable": ["Recipient_List"],

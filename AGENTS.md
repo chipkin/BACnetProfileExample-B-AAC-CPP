@@ -109,7 +109,7 @@ There are no unit tests; verification is behavioural:
    high limit; confirm `Event_State` goes to `high-limit` and an EventNotification
    is sent (check the device log / a listener); write it back and confirm `NORMAL`.
    AcknowledgeAlarm and GetEventInformation both respond.
-6. **AE-CRL-B**: WriteProperty Notification Class 1 "Jade" `Recipient_List` with a
+6. **AE-CRL-B**: WriteProperty Notification Class 1 "Crimson" `Recipient_List` with a
    new destination; fire another alarm and confirm it reaches the new recipient.
 7. **SCHED-I-B**: read Schedule 1 "Saffron"'s `Weekly_Schedule` /
    `Effective_Period` / `Schedule_Default`; press `s` (or wait for the seeded

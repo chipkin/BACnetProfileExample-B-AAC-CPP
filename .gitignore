@@ -1,2 +1,3 @@
 # CMake build output
 build/
+build_full.log
