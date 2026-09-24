@@ -117,7 +117,7 @@ relinquished.
 ## The device this example creates
 
 ```
-Device 389004  "Rainbow"   (Vendor 389 - Chipkin Automation Systems)
+Device 389004  "Chipkin Example B-AAC"   (Vendor 389 - Chipkin Automation Systems)
     ├── Analog Input  1       "Bronze"      read-only sensor (REAL, deg C)
     ├── Binary Input  1       "Emerald"     read-only sensor (active/inactive)
     ├── Multi-State Input 1   "Hot Pink"    read-only sensor (state 1..3)
@@ -134,7 +134,7 @@ Device 389004  "Rainbow"   (Vendor 389 - Chipkin Automation Systems)
 The three inputs are the series' shared minimum; the outputs come from B-SA/B-ASC;
 **Diamond + Crimson are the B-AAC alarming additions; Saffron + Cream are the B-AAC
 scheduling additions**. Object names follow the series' colour convention (Device
-is always "Rainbow").
+is always "Chipkin Example B-AAC").
 
 Every required property of every object, and who answers it, is in
 [docs/PICS.md](docs/PICS.md).
@@ -240,7 +240,7 @@ Common helper (common/) version: 2.5.0
 FYI: Listening for BACnet/IP on UDP port 47808 (Network Port 1).
 TX 21 bytes to 192.168.3.255:47808 (broadcast) (Network Port 1)
 TX 8 bytes to 192.168.3.255:47808 (broadcast) (Network Port 1)
-FYI: Device 389004 ("Rainbow") ready. Vendor ID 389. Press 'h' for help.
+FYI: Device 389004 ("Chipkin Example B-AAC") ready. Vendor ID 389. Press 'h' for help.
 ```
 
 The two `TX` lines are the start-up unsolicited I-Am and the start-up Who-Is
