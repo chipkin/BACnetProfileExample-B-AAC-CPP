@@ -116,9 +116,12 @@ Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1
 
 ## How to verify a change
 
-The Wire Tests in `tests/` automate the discovery half of this (README "Wire
-Tests"): `python3 tests/run_wire_tests.py --exe build/BACnetExampleBAAC`. Run them
-after any change. Beyond them, verification is behavioural:
+The Wire Tests in `tests/` automate steps 2-8 below against a Python operator
+workstation (README "Wire Tests"): `python3 tests/run_wire_tests.py --exe
+build/BACnetExampleBAAC`. Run them after any change, on Windows and Linux. A
+change to a behaviour needs a check that FAILS without it - revert the change,
+watch the check fail, restore it (tests/README.md lists each check's mutation).
+By hand, with a BACnet client:
 
 1. Build, then run one instance on a clear UDP port.
 2. With a BACnet client (e.g. the CAS BACnet Explorer), send **Who-Is** and
@@ -147,9 +150,8 @@ after any change. Beyond them, verification is behavioural:
    (`python tools/gen-objects-properties.py BACnetProfileExample-B-AAC-CPP` from
    the series root) and confirm no row comes out flagged with ⚠.
 
-Verification is manual (no in-repo test suite ships). During development a
-raw-socket smoke script was used against a running instance on a clear `--port`
-(mind the SO_REUSEADDR gotcha - kill stale instances first).
+Run each instance on a clear `--port` (mind the SO_REUSEADDR gotcha on Linux -
+kill stale instances first).
 
 ## Releasing
 

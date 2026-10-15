@@ -73,8 +73,10 @@ errorCode` that the stack presets to `success` and reads only when you return
 `false`, so you *can* turn any decline into a chosen BACnet error. But ending
 every callback with `*errorCode = unknown-property` breaks the device: the
 stack's decline-and-fabricate path is what answers required properties an
-application is not expected to serve - the Device's `Max_APDU_Length_Accepted`,
-`APDU_Timeout` and `Number_Of_APDU_Retries` among them. Name an error on the
+application is not expected to serve - the Device's `Max_APDU_Length_Accepted`
+and `APDU_Timeout` among them. (`Number_Of_APDU_Retries` used to be one too; this
+example now serves it as 3, because the stack's default of 0 means a confirmed
+alarm is never retransmitted - see README "Confirmed notifications are retried".) Name an error on the
 catch-all and those start failing instead of answering. Set `errorCode` only
 where *this device* knows the read is wrong; `main.cpp` does it in exactly one
 place, `State_Text` with an out-of-range array index.
@@ -142,12 +144,18 @@ rather than against "it looked fine in the explorer":
 4. Confirm the services you claim are actually gated correctly: a WriteProperty to
    a read-only input is rejected; a WriteProperty to Diamond or an output succeeds;
    AcknowledgeAlarm and GetEventInformation both respond.
-5. Fire an alarm (WriteProperty Diamond above 90 or below 10) and confirm
-   `Event_State` transitions and an EventNotification is observed, not just that
-   the write succeeded.
-6. Confirm a scheduled transition actually lands: press `s`, then re-read
-   Chartreuse's `Present_Value` and `Priority_Array[8]` rather than trusting the
-   console log alone.
+5. Prove the alarm at a recipient, not at the console. Write `Recipient_List` with
+   a client that asks for **confirmed** notifications, fire an alarm, and check
+   the client received it, SimpleACKed it, and can acknowledge it with the
+   notification's own time stamp (a different time stamp must be refused with
+   `invalid-timestamp`). `tests/alarm_test.py` is that check, automated; if you
+   add an alarm source, copy it.
+6. Confirm a scheduled transition actually lands: time-sync the device to a date
+   and time the schedule covers (`tests/schedule_test.py`), or press `s`, then
+   re-read Chartreuse's `Present_Value` and `Priority_Array[8]` rather than
+   trusting the console log alone.
+7. For each behaviour you add, write a Wire Test check and watch it FAIL with the
+   behaviour removed from `main.cpp` before you trust it to pass.
 
 ### Keeping the PICS honest
 

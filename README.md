@@ -12,6 +12,14 @@ target object on a weekly basis and on the dates in a **Calendar**, sets its
 device clock from **TimeSynchronization**, and handles
 **DeviceCommunicationControl** and **ReinitializeDevice**.
 
+What a B-AAC is for, in one sentence from ANSI/ASHRAE 135-2024 Annex L.4.2:
+**"Generation of limited alarm and event notifications and the ability to direct
+them to recipients"**, **"Tracking acknowledgments of alarms from human
+operators"** and the **"Ability to schedule actions in the local device based on
+date and time"**. This example does all three against a Peer - an operator
+workstation - and the [Wire Tests](#wire-tests) prove it; see
+[The scenario](#the-scenario-an-alarm-reaches-the-operator-and-is-acknowledged).
+
 **[Download a prebuilt binary](https://github.com/chipkin/BACnetProfileExample-B-AAC-CPP/releases)**
 (Windows and Linux x64) - or build it yourself, see [Build](#build) below.
 
@@ -20,18 +28,80 @@ device clock from **TimeSynchronization**, and handles
 - **[docs/PICS.md](docs/PICS.md)** - the Protocol Implementation Conformance
   Statement: every object, every property, and who answers it.
 
-> **Versions:** this document describes **example v1.3.0**, built and verified
+> **Versions:** this document describes **example v1.4.0**, built and verified
 > against **CAS BACnet Stack 6.0.23** (`6.x` @ `64b2cfac5`), at
 > **Protocol_Revision 30**, with the vendored `common/` helper at **v3.3.0**.
 > Running the example prints all three - if what it prints disagrees with this
 > line, trust the program and check `CHANGELOG.md`.
 
-> **What is proven, and how.** The capabilities below work through the
-> customer interface of the stack at this pin; the automated
-> [Wire Tests](#wire-tests) cover discovery only (every property of every
-> object reads). Raising an alarm to a recipient, acknowledging it, and the
-> schedule acting on a time sync are not yet wire-tested - see
-> [TODO.md](TODO.md) and "What this example does NOT do yet" below.
+> **What is proven, and how.** Everything in [The scenario](#the-scenario-an-alarm-reaches-the-operator-and-is-acknowledged)
+> below is driven over BACnet/IP by the automated [Wire Tests](#wire-tests),
+> against a Python operator workstation, through the customer interface of the
+> stack at this pin; each check fails when the feature it checks is removed from
+> `main.cpp`. What is not proven is in "What this example does NOT do yet" and
+> [TODO.md](TODO.md).
+
+## The scenario: an alarm reaches the operator, and is acknowledged
+
+The Peer is an **operator workstation** (a B-OWS / B-AWS on a real site; in the
+Wire Tests, a few dozen lines of Python in [`tests/workstation.py`](tests/workstation.py)).
+
+1. **The workstation subscribes (AE-CRL-B).** It writes Notification Class 1
+   "Crimson"'s `Recipient_List` with itself as the recipient, for **confirmed**
+   notifications on every transition.
+2. **The process goes out of range (AE-N-I-B).** Analog Value 1 "Diamond" is
+   written to 95 - above its `High_Limit` of 90. The stack's intrinsic
+   OutOfRange algorithm moves `Event_State` to `high-limit` and the workstation
+   receives a **ConfirmedEventNotification**: to-state `high-limit`, event type
+   out-of-range, notify type alarm, **ack required**, priority 100.
+3. **The operator looks (AE-INFO-B).** GetEventInformation lists Diamond:
+   `high-limit`, with its to-offnormal transition unacknowledged.
+4. **The operator acknowledges (AE-ACK-B).** AcknowledgeAlarm, quoting the
+   notification's own time stamp, gets a SimpleACK; `Acked_Transitions` shows
+   to-offnormal acknowledged and an **ACK_NOTIFICATION** goes to the recipients
+   (135-2024 13.5.2).
+5. **Back to normal.** Diamond = 50 sends a to-normal notification, which also
+   needs acknowledging.
+6. **The schedule follows the clock (SCHED-I-B, DM-TS-B).** The workstation
+   time-syncs the controller to December 25: Calendar 1 "Cream" turns TRUE and
+   Schedule 1 "Saffron" drives Analog Output 1 "Chartreuse" to 5.0. A Monday at
+   09:00 gives 75.0; 07:00 gives Schedule_Default 20.0.
+7. **Communication control (DM-DCC-B).** DeviceCommunicationControl
+   `disable-initiation` (with the `--dcc-password`) stops the controller sending
+   alarms while it still answers; `enable` resumes them.
+
+**Failure Modes**, each demonstrated by a Wire Test:
+
+- **A stale acknowledgment** - AcknowledgeAlarm with a time stamp that is not the
+  alarm's is refused with `services` / `invalid-timestamp` and acknowledges
+  nothing (13.5.2, 13.5.1.3.1). The stack performs this check.
+- **Nobody acknowledges** - the return to normal stays unacknowledged:
+  `Event_State` is `normal`, the to-normal bit of `Acked_Transitions` is FALSE,
+  and GetEventInformation keeps listing Diamond until someone does.
+- **The workstation goes silent** - its SimpleACKs never come. The controller
+  sends the same ConfirmedEventNotification again every `APDU_Timeout` (10 s),
+  `Number_Of_APDU_Retries` (3) times, then gives up; the alarm is not lost - it
+  is still listed, unacknowledged, by GetEventInformation.
+- **The wrong DCC password** - DeviceCommunicationControl and ReinitializeDevice
+  with a wrong or missing password get `security` / `password-failure`, and the
+  controller keeps sending alarms.
+
+### What is Simulation
+
+**Simulation** - non-BACnet scaffolding standing in for the physical world - is
+small here, and outside the BACnet Surface:
+
+- **The sensor values.** Analog Input 1 "Bronze" is moved by the up/down arrow
+  keys; the other inputs are constants. A real controller reads hardware.
+- **The device clock.** `Local_Date` / `Local_Time` are the host's clock plus an
+  offset that TimeSynchronization sets. A real controller sets its real-time
+  clock.
+
+Diamond's out-of-range value is **not** simulated: it is written over BACnet by
+another device (in the tests, the workstation), which L.4.2 Data Sharing
+provides for ("modification of some or all of its BACnet objects by another
+BACnet device"). The alarm, the acknowledgment tracking, the recipient list, the
+schedule, the calendar and communication control are the stack's real engines.
 
 ## What this example supports
 
@@ -76,10 +146,27 @@ stack runs, with no external Event Enrollment. This example arms **Analog Value 
 **EventNotification** to the recipients of **Notification Class 1 "Crimson"**.
 
 Try it: `WriteProperty` Diamond's `Present_Value` to `95` - the device prints the
-write, `Event_State` becomes `high-limit`, and an `UnconfirmedEventNotification`
-goes out to the recipient. Write it back to `50` and it returns to `NORMAL` (a
-second notification). By default the recipient is the **local subnet broadcast**
-(so any client sees the alarm); point it at a specific client in `main.cpp`.
+write, `Event_State` becomes `high-limit`, and an EventNotification goes out to
+the recipients. Write it back to `50` and it returns to `NORMAL` (a second
+notification). Until a workstation writes the `Recipient_List`, the one recipient
+is the **local subnet broadcast** with **unconfirmed** notifications (so any client
+sees the alarm); point it at a specific client in `main.cpp`, or write the list.
+
+**Confirmed notifications are retried.** A recipient that asks for confirmed
+notifications must SimpleACK each one. If it does not, the controller sends it
+again after `APDU_Timeout` (10 s, the stack's value), up to
+`Number_Of_APDU_Retries` times. `main.cpp` serves that property as **3** (the
+135-2024 12.11.29 suggested default); left unserved it reads 0, which means "this
+device does not perform retries" - one lost datagram and the operator never sees
+the alarm.
+
+**Acknowledgment is checked by the stack.** For an AcknowledgeAlarm the stack
+runs the 13.5.2 procedure: it refuses a `Time Stamp` that is not the latest one
+for the acknowledged transition (`invalid-timestamp`), sets the
+`Acked_Transitions` bit, answers SimpleACK and sends an ACK_NOTIFICATION to the
+same recipients. `main.cpp`'s `AcknowledgeAlarm` callback runs before that check;
+it can refuse an operator (`service-request-denied`), and here it logs who
+acknowledged.
 
 **Redirecting the recipient list (AE-CRL-B).** Notification Class 1 "Crimson"'s
 `Recipient_List` is seeded at start-up **and** registered writable
@@ -159,12 +246,18 @@ Every required property of every object, and who answers it, is in
 
 Full detail and "what it would take" is in **[TODO.md](TODO.md)**.
 
-- **Nothing proves an alarm reaches a recipient.** The alarm path is real, but
-  the only automated test is discovery; no Wire Test yet acts as the recipient,
-  acknowledges, or time-syncs and watches the Schedule.
-- **AcknowledgeAlarm does not check the acknowledged event state or time stamp**
-  against the alarm it acknowledges; it accepts an acknowledgement for Diamond
-  and refuses one for any other object.
+- **Event time stamps are on the host clock, not the synchronised device
+  clock.** A TimeSynchronization moves `Local_Date` / `Local_Time` (and so the
+  Schedule and Calendar), but alarm time stamps come from the shared helper's
+  `GetSystemTime`, which stays on the host clock. A real device has one clock.
+- **An alarm raised while initiation is disabled is not sent later.** During
+  DCC `disable-initiation` a transition still happens (`Event_State`,
+  `Acked_Transitions`, GetEventInformation all show it) but its notification is
+  dropped, not queued; 135-2024 16.1.2 asks only that initiation stop.
+- **An empty `Recipient_List` cannot be written.** WriteProperty of an empty list
+  is answered `property` / `invalid-data-type` by the stack at this pin; write a
+  list naming a recipient instead. See TODO.md.
+- **One alarm source.** Only Analog Value 1 has event reporting.
 
 ## Requires the CAS BACnet Stack (licensed product)
 
@@ -251,7 +344,7 @@ CMake at it: `cmake -B build -S . -D CAS_STACK_DIR=/path/to/cas-bacnet-stack`.
 Expected output:
 
 ```
-BACnet B-AAC (Advanced Application Controller) Example - C++ v1.3.0
+BACnet B-AAC (Advanced Application Controller) Example - C++ v1.4.0
 CAS BACnet Stack version: 6.0.23.0
 Common helper (common/) version: 3.3.0
 FYI: Listening for BACnet/IP on UDP port 47808 (Network Port 1).
@@ -313,8 +406,9 @@ With the [CAS BACnet Explorer](https://store.chipkin.com/products/tools/cas-bacn
 4. **Fire an alarm** - WriteProperty Diamond `Present_Value` = `95`; read
    `Event_State` (`high-limit`) and watch the EventNotification arrive. Write `50`
    to return to `NORMAL`.
-5. **Acknowledge** - send AcknowledgeAlarm for Diamond (AE-ACK-B); the device logs
-   it. Query active events with GetEventInformation (AE-INFO-B).
+5. **Acknowledge** - send AcknowledgeAlarm for Diamond (AE-ACK-B) with the
+   notification's time stamp; the device logs who acknowledged it. Query active
+   events with GetEventInformation (AE-INFO-B).
 6. **Redirect the recipient list (AE-CRL-B)** - WriteProperty Notification Class 1
    (Crimson) `Recipient_List` with a new destination; fire another alarm and confirm
    it goes to the new recipient instead of the seeded one.
@@ -337,22 +431,26 @@ For a property-by-property review against the conformance statement, see
 
 ## Wire Tests
 
-The discovery half of the checks above, automated: a Python BACnet client drives
-the running example over BACnet/IP from outside it, the way a client discovers a
-device - Who-Is, the Device's `Object_List`, then for every object its
-`Property_List` and a ReadProperty of every property it lists. Every read must
-come back as a value; an Error, Reject or Abort fails the run. Python 3 standard
-library only:
+Steps 1-9 above, automated, plus the Failure Modes: Python plays the operator
+workstation and drives the running example over BACnet/IP from outside it. Python 3
+standard library only:
 
 ```bash
 python3 tests/run_wire_tests.py --exe build/BACnetExampleBAAC          # Linux/macOS
 python tests\run_wire_tests.py --exe build\Release\BACnetExampleBAAC.exe   # Windows
 ```
 
-It ends with `ALL WIRE TESTS PASSED` (exit 0). CI runs it on Linux after the
-smoke test. [tests/README.md](tests/README.md) says what each check proves. Steps
-4-9 are not yet automated.
+| Script | What it proves |
+|---|---|
+| `discovery_test.py` | Every listed property of every object reads as a value |
+| `alarm_test.py` | Recipient_List write; the alarm reaches the workstation; GetEventInformation; a stale acknowledgment refused; the real one accepted, with its ACK_NOTIFICATION; an unacknowledged return to normal stays listed; the list decides who hears it |
+| `silent_recipient_test.py` | A silent recipient gets the notification 1 + 3 times, then the controller gives up and keeps the alarm (about 45 s) |
+| `dcc_test.py` | Wrong / missing password refused; `disable-initiation` stops alarms while the device answers; `enable` resumes them |
+| `schedule_test.py` | TimeSynchronization moves Local_Date; Calendar and Schedule follow it to 5.0 / 75.0 / 20.0 |
 
+It ends with `ALL WIRE TESTS PASSED` (exit 0), in a little over a minute. CI runs
+it on Linux after the smoke test. [tests/README.md](tests/README.md) says what each
+check proves and how each was shown to fail without its feature.
 
 ## The BACnet profile example series
 

@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - unreleased
+
+Profile-functional: the example now performs the B-AAC Profile Function against a
+Peer and the Wire Tests prove it (series glossary, `docs/GLOSSARY.md`).
+
+### Added
+
+- **Wire Tests for the Profile Function**, against a Python operator workstation
+  (`tests/workstation.py`) that is both a client and an event recipient:
+  `alarm_test.py` (26 checks: `Recipient_List` write, a confirmed alarm at the
+  workstation, `Event_State` / `Acked_Transitions` / GetEventInformation, a stale
+  acknowledgment refused with `invalid-timestamp`, the real one SimpleACKed with
+  its ACK_NOTIFICATION, an unacknowledged return to normal still listed, alarms
+  redirected to a second workstation), `silent_recipient_test.py` (7),
+  `dcc_test.py` (10) and `schedule_test.py` (5) - phase 1's hand checks of time
+  sync, Calendar and `--dcc-password`, automated. Each check was shown to fail
+  with its feature removed from `main.cpp` (`tests/README.md`). Generic helpers
+  for the series harness: `tests/alarm_codec.py`, `tests/workstation.py`.
+- README "The scenario" (Profile Function quoted from 135-2024 L.4.2, the Peer,
+  the Failure Modes) and "What is Simulation".
+
+### Fixed
+
+- **A confirmed alarm to a silent recipient was sent once and never again.** The
+  stack reads Device `Number_Of_APDU_Retries` (73) through the application's
+  callback when it retries a confirmed request, and its default is 0 ("this
+  device does not perform retries", 12.11.29). `main.cpp` now serves 3, the
+  clause's suggested default: a recipient that does not SimpleACK gets the
+  notification again every `APDU_Timeout` (10 s), three times. PICS row regenerated.
+- **`AcknowledgeAlarm` callback and docs described the wrong check.** The stack
+  runs the 13.5.2 procedure itself - unknown object, no alarm configured, the
+  time stamp (`invalid-timestamp`), the event state - and the callback runs
+  before the time-stamp check, so its "acknowledged" log line printed even for an
+  acknowledgment the stack then refused. Its object check was unreachable (the
+  stack answers `no-alarm-configured` first) and used the wrong error code. The
+  callback now logs who is acknowledging and that the stack decides; README /
+  TODO.md no longer say a stale acknowledgment is accepted (the Wire Test shows it
+  is refused).
+
+### Changed
+
+- TODO.md rewritten: the Wire Test and acknowledgment items are done; added the
+  event time stamps on the host clock, the refused empty `Recipient_List` write,
+  notifications dropped (not queued) under `disable-initiation`, and the stack's
+  `Number_Of_APDU_Retries` default of 0.
+- `release.yml` Wire Test step renamed for the five scripts. APP_VERSION 1.3.0 ->
+  1.4.0.
+
 ## [1.3.0] - unreleased
 
 ### Fixed
