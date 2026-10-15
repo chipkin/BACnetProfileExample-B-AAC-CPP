@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - unreleased
+
+### Fixed
+
+- **Schedule 1 (Saffron) never evaluated.** The stack's Schedule and Calendar
+  engines evaluate against the Device's `Local_Date` (56) and `Local_Time` (57),
+  which the stack does not default; this example did not serve them, so both
+  read Error `property` / `value-not-initialized`, Saffron's `Present_Value` did
+  too, and Chartreuse was never written by the schedule (the README's "press
+  `s` and Chartreuse moves" did not happen). Found by the new discovery Wire
+  Test (17/18 before: Device 56, Device 57, Schedule 1 property 85, each Error
+  class 2 code 72). `main.cpp` now serves both from `GetPropertyDate` /
+  `GetPropertyTime`. The customer header does not document the dependency -
+  recorded in `TODO.md` item 5 as a stack documentation gap (not filed).
+- **"Synchronises its clock" was an overclaim.** `SetSystemTime` only printed the
+  time. It now sets the device clock (`g_clockOffsetSeconds`, an offset from the
+  host clock) that `Local_Date` / `Local_Time` report, so a TimeSynchronization
+  or UTCTimeSynchronization moves the Schedule and the Calendar. A sync with an
+  unspecified (255) field is ignored. The shared helper's `GetSystemTime` (event
+  time stamps, COV lifetimes) stays on the host clock. The `s` demo key adds its
+  `Weekly_Schedule` entry at the device clock's "now".
+- **`--dcc-password` was advertised but ignored** (`--help`, from `common/`,
+  listed it; `main.cpp` compared against a compile-time empty `DCC_PASSWORD`).
+  It now sets the password DeviceCommunicationControl and ReinitializeDevice
+  require (`g_dccPassword`, default empty), and a start-up line says one is set
+  (never what it is).
+
+### Changed
+
+- **Calendar 1 (Cream) is stack-held and Saffron's exception references it.**
+  Stack #963, #1758 and #2034 are closed: at this pin the customer header has
+  `BACnetStack_AddCalendarObject` / `BACnetStack_AddCalendarDateEntry`, and a
+  calendar-reference exception resolves through a stack-held Calendar. Cream's
+  `Date_List` is December 25 of every year (previously a hard-coded inline
+  2026-12-25 exception with an empty Calendar beside it whose `Present_Value`
+  always answered false), the exception uses
+  `BACnetStack_AddScheduleExceptionEventWithCalendarReference`, and the stack
+  derives Cream's `Present_Value`. README, TODO.md, PICS and `docs/objects.json`
+  no longer call it blocked.
+- **Stack Pin moved to `6.x` @ `64b2cfac5` (CAS BACnet Stack 6.0.23)** from
+  `6.x` @ `abd4cee1` (6.0.21), per the series rule that a pin moves to the latest
+  `6.x` whenever an example is updated. No existing call needed changing.
+- **`common/` 3.0.0 -> 3.3.0**, copied verbatim from B-SS-CPP `b640a81`. Additive
+  for this example: four new keys it does not handle (`k`, `o`, `f`, `p` are
+  ignored) and `HelperSendMessage` now sends a broadcast the stack hands it with
+  no address.
+- **Protocol_Revision 24 -> 30** (the stack's default at the new pin): README,
+  AGENTS.md, PICS, `main.cpp` comments.
+- **Segmentation is now supported** (`segmented-both`, `Max_Segments_Accepted`
+  16, `APDU_Segment_Timeout` 5000 ms): the stack's customer build compiles
+  segmentation in from this pin (stack #2992). `docs/PICS.md` section 5 updated;
+  section 11 regenerated.
+- The `Effective_Period` comment in `main.cpp` said "the current calendar year";
+  year 0 makes both bounds open, so the period reads unspecified..unspecified and
+  the Schedule is always in effect. Comment corrected; behaviour unchanged.
+- README, PICS and version lines: stack 6.0.23, `common/` 3.3.0,
+  Protocol_Revision 30, example 1.3.0 (the README still said 1.2.0 and
+  `common/` 2.5.0). Sample output shows the `- Unconfirmed:` suffixes `common/`
+  prints and the Schedule's first write. Series profile table re-synced.
+  APP_VERSION 1.2.2 -> 1.3.0 (minor: behaviour changes above).
+
+### Added
+
+- **Wire Tests** (`tests/`, README "Wire Tests"): `tests/discovery_test.py`
+  (copied from B-SS-CPP `da3e96f`, object list adapted) does what a client's
+  discovery does - Who-Is, the Device's `Object_List` (control: exactly the
+  twelve objects), then every object's `Property_List` and a ReadProperty of
+  every listed property - and fails on any Error, Reject, Abort or silence.
+  `tests/run_wire_tests.py` runs it; CI runs it on Linux after the smoke test.
+  Passes 18/18 (169 reads) on Windows and Linux at the new pin.
+- `wiretest/` 0.5.0, the series' shared Wiretest Harness, vendored verbatim
+  from B-BBMD-CPP.
+- Checked by hand on the wire (Windows, a scratch script, not a committed test):
+  at start Saffron 20.0, Cream FALSE, `Date_List` = one Date entry
+  (unspecified year, 12, 25, unspecified weekday); after TimeSynchronization to
+  2026-12-25 10:00, `Local_Date` reads 2026-12-25, Cream TRUE, Saffron and
+  Chartreuse 5.0; to Monday 2026-10-19 09:00, 75.0; to 07:00 the same day, 20.0.
+
 ## [1.2.2] - unreleased
 
 ### Changed

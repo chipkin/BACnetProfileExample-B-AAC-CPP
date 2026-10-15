@@ -8,7 +8,8 @@ accepts **WriteProperty / WritePropertyMultiple**, generates **intrinsic
 alarms** (EventNotifications when a value goes out of range), accepts
 **AcknowledgeAlarm** and **GetEventInformation**, accepts a WriteProperty that
 redirects its alarm recipient list, runs an internal **Schedule** that writes a
-target object on a weekly/exception basis, synchronises its clock, and handles
+target object on a weekly basis and on the dates in a **Calendar**, sets its
+device clock from **TimeSynchronization**, and handles
 **DeviceCommunicationControl** and **ReinitializeDevice**.
 
 **[Download a prebuilt binary](https://github.com/chipkin/BACnetProfileExample-B-AAC-CPP/releases)**
@@ -19,18 +20,18 @@ target object on a weekly/exception basis, synchronises its clock, and handles
 - **[docs/PICS.md](docs/PICS.md)** - the Protocol Implementation Conformance
   Statement: every object, every property, and who answers it.
 
-> **Versions:** this document describes **example v1.2.0**, built and verified
-> against **CAS BACnet Stack 6.0.21** (`6.x` @ `abd4cee1`), at
-> **Protocol_Revision 24**, with the vendored `common/` helper at **v2.5.0**.
+> **Versions:** this document describes **example v1.3.0**, built and verified
+> against **CAS BACnet Stack 6.0.23** (`6.x` @ `64b2cfac5`), at
+> **Protocol_Revision 30**, with the vendored `common/` helper at **v3.3.0**.
 > Running the example prints all three - if what it prints disagrees with this
 > line, trust the program and check `CHANGELOG.md`.
 
-> **B-AAC is not fully claimable with the standard stack yet.** This example
-> implements every B-AAC capability the standard CAS BACnet Stack exposes, and
-> clearly marks what it cannot do. **See [TODO.md](TODO.md)** and "What this
-> example does NOT do yet" below. The remaining gap is Calendar 1 (Cream)'s
-> `Date_List`, a stack-documented limitation (issue #963), not a missing
-> feature of this example.
+> **What is proven, and how.** The capabilities below work through the
+> customer interface of the stack at this pin; the automated
+> [Wire Tests](#wire-tests) cover discovery only (every property of every
+> object reads). Raising an alarm to a recipient, acknowledging it, and the
+> schedule acting on a time sync are not yet wire-tested - see
+> [TODO.md](TODO.md) and "What this example does NOT do yet" below.
 
 ## What this example supports
 
@@ -47,7 +48,7 @@ target object on a weekly/exception basis, synchronises its clock, and handles
 | Internal scheduling | SCHED-I-B | ✅ |
 | DeviceCommunicationControl | DM-DCC-B | ✅ |
 | ReinitializeDevice | DM-RD-B | ✅ (cold/warm start) |
-| Time synchronisation | DM-TS-B / DM-UTC-B | ✅ |
+| Time synchronisation | DM-TS-B / DM-UTC-B | ✅ (sets the device clock: `Local_Date` / `Local_Time`, which the Schedule and Calendar follow) |
 | Who-Is/I-Am (answer + initiate), Who-Has/I-Have | DM-DDB-A,B, DM-DOB-B | ✅ |
 
 ### Services (executed / B-side)
@@ -60,7 +61,7 @@ target object on a weekly/exception basis, synchronises its clock, and handles
 | Who-Has / I-Have | Answers Who-Has with I-Have (DM-DOB-B). |
 | DeviceCommunicationControl | Enables/disables initiation, password-checked (DM-DCC-B). |
 | ReinitializeDevice | Accepts COLDSTART/WARMSTART, password-checked, deferred restart (DM-RD-B). |
-| TimeSynchronization / UTCTimeSynchronization | Accepts a time sync from a management station (DM-TS-B / DM-UTC-B). |
+| TimeSynchronization / UTCTimeSynchronization | Sets the device clock from a management station's time sync (DM-TS-B / DM-UTC-B); see [The device clock](#the-device-clock-dm-ts-b--dm-utc-b). |
 | (Un)ConfirmedEventNotification | Sent when Diamond's intrinsic algorithm transitions (AE-N-I-B). |
 | AcknowledgeAlarm | Accepts an acknowledgement for an active event (AE-ACK-B). |
 | GetEventInformation | Reports active events (AE-INFO-B). |
@@ -96,19 +97,34 @@ at priority 8, on two kinds of trigger:
 
 - A **weekly** transition (`Weekly_Schedule`): every Monday at 08:00, Chartreuse
   moves to the demo value.
-- A one-off **exception** (`Exception_Schedule`): 2026-12-25, added with
-  `BACnetStack_AddScheduleExceptionEventWithCalendarEntry` (an inline calendar
-  date, not a reference to a Calendar object - see "What this example does NOT do
-  yet").
+- An **exception** (`Exception_Schedule`) that **references Calendar 1
+  "Cream"**, added with `BACnetStack_AddScheduleExceptionEventWithCalendarReference`:
+  on every date in Cream's `Date_List`, Chartreuse goes to 5.0 for the whole day.
+  Cream is **stack-held** (`BACnetStack_AddCalendarObject`): the stack keeps its
+  `Date_List` - one entry, December 25 of every year
+  (`BACnetStack_AddCalendarDateEntry`) - and derives its `Present_Value` (TRUE on
+  a listed date). Change the holidays by changing the Calendar, not the
+  Schedule.
 
 Outside any active weekly or exception entry, `Schedule_Default` applies (20.0,
-Chartreuse's steady-state setpoint). Because a real demo cannot wait for Monday
-08:00 to arrive, pressing **`s`** at the console adds a `Weekly_Schedule` entry for
-**right now** (today, current time) - the schedule engine evaluates against
-wall-clock time on every tick, so the new entry is immediately the latest
-transition today and Chartreuse moves within a second or two. `Calendar 1 "Cream"`
-exists alongside the exception, for completeness, but is not referenced by it (see
-"What this example does NOT do yet").
+Chartreuse's steady-state setpoint). The stack's schedule engine evaluates
+against the **Device's `Local_Date` and `Local_Time`** on every tick - the device
+clock below - so a TimeSynchronization to a Monday after 08:00 moves Chartreuse to
+75.0, and one to December 25 moves it to 5.0. Pressing **`s`** at the console
+adds a `Weekly_Schedule` entry for **right now** on the device clock, so the new
+entry is immediately the latest transition today and Chartreuse moves within a
+second or two.
+
+## The device clock (DM-TS-B / DM-UTC-B)
+
+The Device's `Local_Date` and `Local_Time` are served by `main.cpp`
+(`GetPropertyDate` / `GetPropertyTime`): the host's wall clock plus the
+correction the last TimeSynchronization or UTCTimeSynchronization applied
+(`SetSystemTime`). The stack does not invent these two properties, and its
+Schedule and Calendar engines read them - an example that does not serve them has
+a Schedule that never evaluates. A real device would set its real-time clock
+instead of keeping an offset. Event time stamps and COV lifetimes use the shared
+helper's `GetSystemTime`, which stays on the host clock.
 
 `Priority_For_Writing` (8) sits below a manual override: `WriteProperty`
 Chartreuse at a priority 1-7 and it wins over the schedule until that slot is
@@ -127,8 +143,8 @@ Device 389004  "Chipkin Example B-AAC"   (Vendor 389 - Chipkin Automation System
     ├── Analog Value 1        "Diamond"     writable; intrinsic OutOfRange ALARM
     ├── Notification Class 1  "Crimson"        routes Diamond's alarms to recipients; Recipient_List writable (AE-CRL-B)
     ├── Network Port 1        "Vermilion"   the BACnet/IP port (required)
-    ├── Schedule 1             "Saffron"     SCHED-I-B: drives Chartreuse on a weekly schedule + one exception
-    └── Calendar 1             "Cream"       exists alongside Saffron's exception (see TODO.md)
+    ├── Schedule 1             "Saffron"     SCHED-I-B: drives Chartreuse on a weekly schedule + the dates in Cream
+    └── Calendar 1             "Cream"       stack-held Date_List: December 25, every year
 ```
 
 The three inputs are the series' shared minimum; the outputs come from B-SA/B-ASC;
@@ -141,15 +157,14 @@ Every required property of every object, and who answers it, is in
 
 ## What this example does NOT do yet
 
-A faithful, honest example: this one B-AAC-adjacent detail is **not** implemented,
-because the standard CAS BACnet Stack does not yet expose a way to. Full detail and
-"what it would take" is in **[TODO.md](TODO.md)**.
+Full detail and "what it would take" is in **[TODO.md](TODO.md)**.
 
-- **Calendar 1 (Cream)'s `Date_List`** - there is no customer-facing export or
-  callback to populate a Calendar object's `Date_List`, so Schedule 1 (Saffron)'s
-  one-off exception uses an inline calendar-date entry rather than a reference to
-  Cream (cas-bacnet-stack issue #963). Cream still exists as a correctly-served
-  object otherwise.
+- **Nothing proves an alarm reaches a recipient.** The alarm path is real, but
+  the only automated test is discovery; no Wire Test yet acts as the recipient,
+  acknowledges, or time-syncs and watches the Schedule.
+- **AcknowledgeAlarm does not check the acknowledged event state or time stamp**
+  against the alarm it acknowledges; it accepts an acknowledgement for Diamond
+  and refuses one for any other object.
 
 ## Requires the CAS BACnet Stack (licensed product)
 
@@ -177,6 +192,8 @@ This is a **self-contained** project. It ships:
 - `CMakeLists.txt` - the build, the same on Windows, Linux, and macOS.
 - `docs/PICS.md` - the conformance statement.
 - `TODO.md` - what B-AAC requires that this example does not yet do, and why.
+- `tests/` - the Wire Tests (see [Wire Tests](#wire-tests)), and `wiretest/`, the
+  series' shared Python harness they are written against (vendored, like `common/`).
 - `submodules/cas-bacnet-stack/` - the **CAS BACnet Stack as a git submodule**
   (private; requires a license - see above). Its sources are compiled into the
   executable, so there is no library or DLL to build, ship, or install.
@@ -234,13 +251,14 @@ CMake at it: `cmake -B build -S . -D CAS_STACK_DIR=/path/to/cas-bacnet-stack`.
 Expected output:
 
 ```
-BACnet B-AAC (Advanced Application Controller) Example - C++ v1.2.0
-CAS BACnet Stack version: 6.0.21.0
-Common helper (common/) version: 2.5.0
+BACnet B-AAC (Advanced Application Controller) Example - C++ v1.3.0
+CAS BACnet Stack version: 6.0.23.0
+Common helper (common/) version: 3.3.0
 FYI: Listening for BACnet/IP on UDP port 47808 (Network Port 1).
-TX 21 bytes to 192.168.3.255:47808 (broadcast) (Network Port 1)
-TX 8 bytes to 192.168.3.255:47808 (broadcast) (Network Port 1)
+TX 21 bytes to 192.168.3.255:47808 (broadcast) (Network Port 1) - Unconfirmed: I-Am
+TX 8 bytes to 192.168.3.255:47808 (broadcast) (Network Port 1) - Unconfirmed: Who-Is
 FYI: Device 389004 ("Chipkin Example B-AAC") ready. Vendor ID 389. Press 'h' for help.
+WriteProperty: Analog Output 1 (Chartreuse) <- 20.00 @ priority 8
 ```
 
 The two `TX` lines are the start-up unsolicited I-Am and the start-up Who-Is
@@ -248,7 +266,8 @@ The two `TX` lines are the start-up unsolicited I-Am and the start-up Who-Is
 the **local subnet broadcast** address (here `192.168.3.255`, computed from the
 Network Port's interface), not the global `255.255.255.255`. As clients talk to
 the device you'll see `RX ... bytes from ...` and `TX ... bytes to ...` lines
-showing the traffic.
+showing the traffic. The `WriteProperty` line is Schedule 1 (Saffron)'s first
+evaluation writing `Schedule_Default` to Chartreuse.
 
 The device listens on UDP **47808** (BACnet/IP). Allow that port through your
 firewall. To use a different port, pass `--port` (see below).
@@ -264,6 +283,7 @@ firewall. To use a different port, pass `--port` (see below).
 |--------|---------|---------|
 | `--port <n>` | `47808` | UDP port to listen on (BACnet/IP). |
 | `--deviceID <n>` | `389004` | The device's BACnet instance number (BACnet requires this to be configurable). |
+| `--dcc-password <string>` | none | Require this password on DeviceCommunicationControl and ReinitializeDevice. Prints a `FYI: ... require a password` line at start-up (never the password). |
 | `--help`, `-h` | - | Show usage and exit. |
 | `--version` | - | Print the example, stack, and `common/` helper versions, then exit. |
 
@@ -287,7 +307,7 @@ With the [CAS BACnet Explorer](https://store.chipkin.com/products/tools/cas-bacn
 1. **Discover** - Who-Is -> I-Am from `389004` (vendor `389`).
 2. **Object model** - twelve objects incl. Analog Value "Diamond", Notification
    Class "Crimson", Schedule "Saffron" and Calendar "Cream". `Object_List` lists
-   them all; `Protocol_Revision` = 24.
+   them all; `Protocol_Revision` = 30.
 3. **ReadPropertyMultiple** - read several properties of "Diamond" in one request
    (DS-RPM-B).
 4. **Fire an alarm** - WriteProperty Diamond `Present_Value` = `95`; read
@@ -299,20 +319,45 @@ With the [CAS BACnet Explorer](https://store.chipkin.com/products/tools/cas-bacn
    (Crimson) `Recipient_List` with a new destination; fire another alarm and confirm
    it goes to the new recipient instead of the seeded one.
 7. **Scheduling (SCHED-I-B)** - read Schedule 1 (Saffron)'s `Weekly_Schedule`,
-   `Effective_Period` and `Schedule_Default`; press `s` at the console (or wait for
-   the seeded Monday 08:00 transition) and confirm Analog Output 1 (Chartreuse)
-   `Present_Value` changes and `Priority_Array[8]` shows the write.
-8. **Device management** - DeviceCommunicationControl `disable-initiation` /
-   `enable`; ReinitializeDevice `WARMSTART`; TimeSynchronization - each is accepted.
+   `Effective_Period` and `Schedule_Default`, and Calendar 1 (Cream)'s
+   `Date_List` (December 25, any year) and `Present_Value`; press `s` at the
+   console and confirm Analog Output 1 (Chartreuse) `Present_Value` changes to
+   75.0 and `Priority_Array[8]` shows the write.
+8. **Time sync (DM-TS-B)** - send TimeSynchronization for 2026-12-25 10:00: the
+   Device's `Local_Date` / `Local_Time` read it back, Cream's `Present_Value`
+   is TRUE and Saffron's (and Chartreuse's) is 5.0. Sync to a Monday at 09:00 and
+   it is 75.0; to 07:00 the same day and it is back to 20.0.
+9. **Device management** - DeviceCommunicationControl `disable-initiation` /
+   `enable`; ReinitializeDevice `WARMSTART` - each is accepted. Start the example
+   with `--dcc-password s3cret` and a request without it is refused with
+   `password-failure`.
 
 For a property-by-property review against the conformance statement, see
 [TUTORIAL.md](TUTORIAL.md).
+
+## Wire Tests
+
+The discovery half of the checks above, automated: a Python BACnet client drives
+the running example over BACnet/IP from outside it, the way a client discovers a
+device - Who-Is, the Device's `Object_List`, then for every object its
+`Property_List` and a ReadProperty of every property it lists. Every read must
+come back as a value; an Error, Reject or Abort fails the run. Python 3 standard
+library only:
+
+```bash
+python3 tests/run_wire_tests.py --exe build/BACnetExampleBAAC          # Linux/macOS
+python tests\run_wire_tests.py --exe build\Release\BACnetExampleBAAC.exe   # Windows
+```
+
+It ends with `ALL WIRE TESTS PASSED` (exit 0). CI runs it on Linux after the
+smoke test. [tests/README.md](tests/README.md) says what each check proves. Steps
+4-9 are not yet automated.
 
 
 ## The BACnet profile example series
 
 <!-- PROFILE-TABLE:BEGIN (generated from cas-bacnet-stack-examples/docs/profile-table.md - do not edit here) -->
-The CAS BACnet Stack supports every standardized device profile in ASHRAE 135-2024 Annex L, and there is one example repository per profile. Pick the profile your device claims, then the language you build in. "Ask" means the example hasn't been built yet for that language - [contact Chipkin](https://store.chipkin.com/contact-us) if you need one.
+There is one example repository per standardized device profile in ASHRAE 135-2024 Annex L. An example marked ⛔ is blocked: the stack cannot yet perform that profile's function through its customer interface, and the example's README says what it does today. Pick the profile your device claims, then the language you build in. "Ask" means the example hasn't been built yet for that language - [contact Chipkin](https://store.chipkin.com/contact-us) if you need one.
 
 ### Controllers (Annex L.4)
 
@@ -335,7 +380,7 @@ The CAS BACnet Stack supports every standardized device profile in ASHRAE 135-20
 
 | Profile | C++ | Node.js | C# | Rust | Python | Go |
 |---|---|---|---|---|---|---|
-| **B-ACC** Access Control Controller | [B-ACC-CPP](https://github.com/chipkin/BACnetProfileExample-B-ACC-CPP) | Ask | Ask | Ask | Ask | Ask |
+| **B-ACC** Access Control Controller | [B-ACC-CPP](https://github.com/chipkin/BACnetProfileExample-B-ACC-CPP) ⛔ blocked on [stack #2150](https://github.com/chipkin/cas-bacnet-stack/issues/2150), [#2044](https://github.com/chipkin/cas-bacnet-stack/issues/2044) | Ask | Ask | Ask | Ask | Ask |
 | **B-AACC** Advanced Access Control Controller | [B-AACC-CPP](https://github.com/chipkin/BACnetProfileExample-B-AACC-CPP) | Ask | Ask | Ask | Ask | Ask |
 
 ### Lighting controllers (Annex L.11)
@@ -357,7 +402,7 @@ The CAS BACnet Stack supports every standardized device profile in ASHRAE 135-20
 
 | Profile | C++ | Node.js | C# | Rust | Python | Go |
 |---|---|---|---|---|---|---|
-| **B-AS** Authorization Server | [B-AS-CPP](https://github.com/chipkin/BACnetProfileExample-B-AS-CPP) | Ask | Ask | Ask | Ask | Ask |
+| **B-AS** Authorization Server | [B-AS-CPP](https://github.com/chipkin/BACnetProfileExample-B-AS-CPP) ⛔ blocked on [stack #2043](https://github.com/chipkin/cas-bacnet-stack/issues/2043) | Ask | Ask | Ask | Ask | Ask |
 
 ### Miscellaneous (Annex L.7, combinable with any one family)
 
@@ -365,10 +410,10 @@ The CAS BACnet Stack supports every standardized device profile in ASHRAE 135-20
 |---|---|---|---|---|---|---|
 | **B-BBMD** Broadcast Management Device | [B-BBMD-CPP](https://github.com/chipkin/BACnetProfileExample-B-BBMD-CPP) | Ask | Ask | Ask | Ask | Ask |
 | **B-ACDC** Access Control Door Controller | [B-ACDC-CPP](https://github.com/chipkin/BACnetProfileExample-B-ACDC-CPP) | Ask | Ask | Ask | Ask | Ask |
-| **B-ACCR** Access Control Credential Reader | [B-ACCR-CPP](https://github.com/chipkin/BACnetProfileExample-B-ACCR-CPP) | Ask | Ask | Ask | Ask | Ask |
+| **B-ACCR** Access Control Credential Reader | [B-ACCR-CPP](https://github.com/chipkin/BACnetProfileExample-B-ACCR-CPP) ⛔ blocked on [stack #3934](https://github.com/chipkin/cas-bacnet-stack/issues/3934) | Ask | Ask | Ask | Ask | Ask |
 | **B-RTR** Router | [B-RTR-CPP](https://github.com/chipkin/BACnetProfileExample-B-RTR-CPP) | Ask | Ask | Ask | Ask | Ask |
 | **B-GW** Gateway | [B-GW-CPP](https://github.com/chipkin/BACnetProfileExample-B-GW-CPP) | Ask | Ask | Ask | Ask | Ask |
-| **B-DAP** Device Address Proxy | [B-DAP-CPP](https://github.com/chipkin/BACnetProfileExample-B-DAP-CPP) | Ask | Ask | Ask | Ask | Ask |
+| **B-DAP** Device Address Proxy | [B-DAP-CPP](https://github.com/chipkin/BACnetProfileExample-B-DAP-CPP) ⛔ blocked on [stack #2032](https://github.com/chipkin/cas-bacnet-stack/issues/2032) | Ask | Ask | Ask | Ask | Ask |
 | **B-SCHUB** BACnet/SC Hub | [B-SCHUB-CPP](https://github.com/chipkin/BACnetProfileExample-B-SCHUB-CPP) | Ask | Ask | Ask | Ask | Ask |
 | **B-GENERAL** General device (Annex L.8) | *(satisfied by every example above)* | — | — | — | — | — |
 
@@ -396,7 +441,7 @@ Client-side profiles.
 | **B-EWS** Elevator Workstation | planned | — | — | — | — | — |
 | **B-AEWS** Advanced Elevator Workstation | planned | — | — | — | — | — |
 
-🚧 = in progress. "Ask" = not yet built for that language; contact Chipkin if you need it. Profile definitions: ANSI/ASHRAE 135-2024 Annex L. BIBB definitions: Annex K. Get the stack: <https://store.chipkin.com/services/stacks/bacnet-stack>.
+🚧 = in progress. ⛔ = Blocked Example (blocked on the named stack gap). "Ask" = not yet built for that language; contact Chipkin if you need it. Profile definitions: ANSI/ASHRAE 135-2024 Annex L. BIBB definitions: Annex K. Get the stack: <https://store.chipkin.com/services/stacks/bacnet-stack>.
 <!-- PROFILE-TABLE:END -->
 
 ## References

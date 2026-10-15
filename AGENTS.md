@@ -11,9 +11,9 @@ A **tutorial** C++ example that implements **as much of** the BACnet **B-AAC
 supports. It is one of a series - one git repo per BACnet profile - and builds on
 B-ASC by adding ReadPropertyMultiple/WritePropertyMultiple, **intrinsic alarming**
 (AE-N-I-B / AE-ACK-B / AE-INFO-B / AE-CRL-B), **internal scheduling** (SCHED-I-B),
-time synchronisation, and ReinitializeDevice. What B-AAC requires but the stack
-cannot yet do (a Calendar object's `Date_List`) is documented in
-[TODO.md](TODO.md) - keep that file honest and current. The top priority is that
+time synchronisation, and ReinitializeDevice. What B-AAC requires that this
+example does not yet do or prove is documented in [TODO.md](TODO.md) - keep that
+file honest and current. The top priority is that
 the code reads like a tutorial a customer can learn from and copy-paste. Favour
 clarity over cleverness.
 
@@ -73,7 +73,7 @@ Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1
 
 - Device is named "Chipkin Example B-AAC"; objects use the series' colour names; vendor id 389.
 - Implement the B-AAC services the stack supports; expose **every required
-  property** of each object for Protocol_Revision 24. Anything B-AAC requires that
+  property** of each object for Protocol_Revision 30. Anything B-AAC requires that
   is NOT implemented must be listed in [TODO.md](TODO.md) and the README.
 - Intrinsic alarming: arm an object with `SetIntrinsic*Algorithm` + a Notification
   Class (`AddNotificationClassObject` + `AddRecipientToNotificationClass`) +
@@ -87,18 +87,23 @@ Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1
 - SCHED-I-B: `BACnetStack_AddScheduleObject` + `AddScheduleObjectPropertyReference`
   + `AddScheduleWeeklyTimeValue` / `SetScheduleDefault` /
   `SetScheduleEffectivePeriod` / `SetSchedulePriorityForWriting` create and drive a
-  Schedule; the stack's engine evaluates it against wall-clock time and writes the
-  referenced property at the configured priority. Prefer
-  `AddScheduleExceptionEventWithCalendarEntry` (inline date) over
-  `...WithCalendarReference` (a Calendar object) - the latter does not currently
-  evaluate the Calendar's `Date_List` (issue #963).
+  Schedule; the stack's engine evaluates it against the Device's `Local_Date` /
+  `Local_Time` - which the app MUST serve (`GetPropertyDate` / `GetPropertyTime`),
+  or the Schedule never evaluates - and writes the referenced property at the
+  configured priority. Calendar 1 is stack-held (`AddCalendarObject` +
+  `AddCalendarDateEntry`) and Saffron's exception references it
+  (`AddScheduleExceptionEventWithCalendarReference`).
+- Time sync (DM-TS-B / DM-UTC-B): `SetSystemTime` sets the device clock
+  (`g_clockOffsetSeconds`) that `Local_Date` / `Local_Time` report. The shared
+  helper's `GetSystemTime` stays on the host clock (monotonic, for COV
+  lifetimes and time stamps).
 - Outputs are **commandable**: store the 16-slot `Priority_Array` +
   `Relinquish_Default` in the app (the `Commandable` struct); let the stack
   resolve `Present_Value`. Writes land via the `SetProperty*` callbacks (value)
   and `SetPropertyNull` (relinquish).
 - DeviceCommunicationControl (DM-DCC-B): the stack runs the enable/disable state
-  machine; the `DeviceCommunicationControl` callback just validates `DCC_PASSWORD`
-  and logs. The deprecated plain `disable` (1) is rejected by the stack at
+  machine; the `DeviceCommunicationControl` callback just validates the password
+  (`g_dccPassword`, from `--dcc-password`; ReinitializeDevice shares it) and logs. The deprecated plain `disable` (1) is rejected by the stack at
   Protocol_Revision >= 20 - only `enable` (0) and `disable-initiation` (2) apply.
 - ReinitializeDevice (DM-RD-B): accept-and-defer, never restart in the callback -
   see [docs/deferred-restart-adoption.md](docs/deferred-restart-adoption.md).
@@ -111,13 +116,15 @@ Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1
 
 ## How to verify a change
 
-There are no unit tests; verification is behavioural:
+The Wire Tests in `tests/` automate the discovery half of this (README "Wire
+Tests"): `python3 tests/run_wire_tests.py --exe build/BACnetExampleBAAC`. Run them
+after any change. Beyond them, verification is behavioural:
 
 1. Build, then run one instance on a clear UDP port.
 2. With a BACnet client (e.g. the CAS BACnet Explorer), send **Who-Is** and
    confirm **I-Am** from the device instance.
 3. **ReadProperty** every required property of every object and confirm the
-   values; confirm `Protocol_Revision` is 24 and `Object_List` lists all objects.
+   values; confirm `Protocol_Revision` is 30 and `Object_List` lists all objects.
 4. **WriteProperty** a commandable output's `Present_Value` at a priority, re-read
    it (and its `Priority_Array`), then write NULL to relinquish and confirm it
    falls back to `Relinquish_Default`. Confirm a write to a read-only input is
@@ -129,11 +136,13 @@ There are no unit tests; verification is behavioural:
 6. **AE-CRL-B**: WriteProperty Notification Class 1 "Crimson" `Recipient_List` with a
    new destination; fire another alarm and confirm it reaches the new recipient.
 7. **SCHED-I-B**: read Schedule 1 "Saffron"'s `Weekly_Schedule` /
-   `Effective_Period` / `Schedule_Default`; press `s` (or wait for the seeded
-   Monday 08:00 transition) and confirm Analog Output 1 "Chartreuse"
-   `Present_Value` changes and `Priority_Array[8]` shows the write.
+   `Effective_Period` / `Schedule_Default`; press `s` and confirm Analog Output 1
+   "Chartreuse" `Present_Value` changes and `Priority_Array[8]` shows the write.
+   TimeSynchronization to 2026-12-25: Calendar 1 "Cream" `Present_Value` TRUE and
+   Chartreuse 5.0; to a Monday 09:00: Chartreuse 75.0.
 8. **Device management**: ReinitializeDevice WARMSTART SimpleACKs; DCC
-   `disable-initiation`/`enable` SimpleACK; a wrong password (if set) is rejected.
+   `disable-initiation`/`enable` SimpleACK; with `--dcc-password <string>`, a
+   wrong password is rejected.
 9. If you changed the objects or their properties, regenerate `docs/PICS.md`
    (`python tools/gen-objects-properties.py BACnetProfileExample-B-AAC-CPP` from
    the series root) and confirm no row comes out flagged with ⚠.

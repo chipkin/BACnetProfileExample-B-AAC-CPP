@@ -121,7 +121,8 @@ It differs per type - this is the checklist, so you do not have to infer it:
 | Notification Class | `Object_Name` | `Priority`/`Ack_Required`/`Recipient_List` via `AddNotificationClassObject`/`AddRecipientToNotificationClass`, not a `GetProperty*` callback |
 | Network Port | `Object_Name`, `Network_Type`, `Protocol_Level`, `Changes_Pending`, IP addressing | - |
 | Schedule | `Object_Name`, `Reliability` | Weekly/exception data via `AddSchedule*`/`SetSchedule*`, not a `GetProperty*` callback |
-| Calendar | `Object_Name`, `Present_Value` | `Date_List` cannot be populated - see [TODO.md](TODO.md) |
+| Calendar (stack-held) | `Object_Name` | `Date_List` / `Present_Value` held by the stack: `AddCalendarObject` + `AddCalendar*Entry` |
+| Device | `Local_Date`, `Local_Time` (`GetPropertyDate` / `GetPropertyTime`) | The Schedule and Calendar engines read them; with no callback both read `value-not-initialized` and the Schedule never runs |
 
 ## Reviewing your device
 
@@ -132,7 +133,9 @@ rather than against "it looked fine in the explorer":
    (see [Keeping the PICS honest](#keeping-the-pics-honest) below). A ⚠ row is a
    required property nothing serves.
 2. Read **every** property listed for **every** object with a BACnet client, and
-   compare the value against the PICS. `"undefined"`, `no-units` and `0` are the
+   compare the value against the PICS. `tests/run_wire_tests.py` reads them all
+   and fails on any that does not return a value (README "Wire Tests") - keep it
+   passing, then check the values yourself. `"undefined"`, `no-units` and `0` are the
    three shapes a missed callback takes.
 3. Diff a new object of a type against the existing one of that type. Anything
    that differs and shouldn't is a callback that matched on instance.
