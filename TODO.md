@@ -49,7 +49,7 @@ Value). The stack exposes ~19 `SetIntrinsic*Algorithm` functions (ChangeOfState,
 ChangeOfValue, FloatingLimit, CommandFailure, BufferReady, ...). A richer B-AAC
 could arm several object types. Left as a single, clear example on purpose.
 
-## 5. Stack documentation gap (not filed; for the coordinator)
+## 5. Stack documentation gap - filed as [#3958](https://github.com/chipkin/cas-bacnet-stack/issues/3958)
 
 **The Schedule and Calendar engines read the Device's `Local_Date` / `Local_Time`,
 and the customer header does not say so.** `BACnetDBDevice::RunSchedule` and
