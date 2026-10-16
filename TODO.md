@@ -25,6 +25,8 @@ notification itself, so they do not depend on either clock.
 
 ## 2. Writing an empty Recipient_List is refused
 
+Filed: [#3959](https://github.com/chipkin/cas-bacnet-stack/issues/3959).
+
 **Status: stack behaviour, observed; not confirmed as a defect.** WriteProperty of
 Notification Class 1 `Recipient_List` with an empty list (an opening and closing
 tag [3] with nothing between) is answered Error `property` /
@@ -76,6 +78,8 @@ Test at 1.2.2 + this pin failed on Device 56, Device 57 and Schedule 1 property
 85, all Error class 2 code 72; with the two callbacks it passes 18/18.
 
 ## 7. Number_Of_APDU_Retries defaults to 0 in the stack
+
+Filed as a documentation gap: [#3960](https://github.com/chipkin/cas-bacnet-stack/issues/3960) (0 is conformant; cl. 12.11.29 suggests 3).
 
 **Status: worked around here; stack default, noted for the series.** The stack's
 `CAS_BACNET_DEVICE_DEFAULT_NUMBER_OF_APDU_RETRIES` is 0 (`BACnetDBDevice.h` at
