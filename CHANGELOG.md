@@ -47,6 +47,13 @@ Peer and the Wire Tests prove it (series glossary, `docs/GLOSSARY.md`).
 
 ### Changed
 
+- **`common/` 3.3.0 -> 3.4.0**, copied verbatim from B-SS-CPP `5d78299`: `HelperSendMessage`
+  sends a broadcast addressed to this socket's own address to the subnet broadcast instead of
+  unicast to itself (stack #3933). README version lines updated.
+- `tests/discovery_test.py` sends its Who-Is once more, with a visible `[RETRY]` line, when no
+  I-Am comes back in 3 s (`tools/patch-discovery-whois-retry.py` from the example series).
+  Who-Is is unconfirmed, so nothing else retries it, and the example's UDP receive can drop a
+  datagram on Windows (`common/` SimpleUDP).
 - TODO.md rewritten: the Wire Test and acknowledgment items are done; added the
   event time stamps on the host clock, the refused empty `Recipient_List` write,
   notifications dropped (not queued) under `disable-initiation`, and the stack's
