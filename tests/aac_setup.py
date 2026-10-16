@@ -26,8 +26,8 @@ sys.path.insert(0, str(REPOSITORY))
 sys.path.insert(0, str(TESTS))
 
 import wiretest  # noqa: E402  (the vendored harness at the repository root)
-import alarm_codec  # noqa: E402
-from workstation import Workstation  # noqa: E402
+from wiretest import Workstation  # noqa: E402  (wiretest 0.6.0)
+from wiretest import alarm as alarm_codec  # noqa: E402
 
 # Match main.cpp.
 DEVICE_INSTANCE = 389004

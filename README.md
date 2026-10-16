@@ -44,7 +44,8 @@ workstation - and the [Wire Tests](#wire-tests) prove it; see
 ## The scenario: an alarm reaches the operator, and is acknowledged
 
 The Peer is an **operator workstation** (a B-OWS / B-AWS on a real site; in the
-Wire Tests, a few dozen lines of Python in [`tests/workstation.py`](tests/workstation.py)).
+Wire Tests, a few dozen lines of Python: `Workstation` in the series harness,
+[`wiretest/workstation.py`](wiretest/workstation.py)).
 
 1. **The workstation subscribes (AE-CRL-B).** It writes Notification Class 1
    "Crimson"'s `Recipient_List` with itself as the recipient, for **confirmed**

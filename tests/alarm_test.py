@@ -8,7 +8,7 @@
 The Profile Function (135-2024 L.4.2, Alarm and Event Management): "Generation of limited
 alarm and event notifications and the ability to direct them to recipients" and "Tracking
 acknowledgments of alarms from human operators", with "configuration of event recipient
-lists". The Peer is a Python operator workstation (tests/workstation.py).
+lists". The Peer is a Python operator workstation (wiretest.Workstation).
 
   1. AE-CRL-B: the workstation writes Notification Class 1's Recipient_List with itself
      as the one recipient (confirmed notifications, every transition). It reads back.

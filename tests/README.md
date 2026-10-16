@@ -30,7 +30,7 @@ Workstation (127.0.0.1, ephemeral UDP port)  - the Peer: a Python operator works
 BACnetExampleBAAC            UDP --port   - Device 389004
 ```
 
-The Peer is a Python-simulated operator workstation (`workstation.py`), never
+The Peer is a Python-simulated operator workstation (`wiretest.Workstation`), never
 another example's binary. It is a client (it writes, reads, acknowledges,
 synchronises the clock) and an event recipient at once: a background thread keeps
 every EventNotification and SimpleACKs the confirmed ones within the controller's
@@ -85,18 +85,10 @@ checked against a control in the same run - the right time stamp is accepted, th
 wrong one is not; notifications arrive before DISABLE and after ENABLE, and not
 between.
 
-## Helpers proposed for `wiretest/` 0.6.0
+## Shared helpers
 
-`wiretest/` 0.5.0 is frozen this round, so two generic modules live here, named
-for nothing B-AAC-specific:
-
-- `alarm_codec.py` - AcknowledgeAlarm, GetEventInformation (request and ACK
-  parser), DeviceCommunicationControl, TimeSynchronization, SimpleACK,
-  BACnetDestination (`Recipient_List`), Date / Time / BIT STRING / BACnetTimeStamp
-  encoders, and an `EventNotification` decoder for Confirmed- and
-  UnconfirmedEventNotification.
-- `workstation.py` - `Workstation`, a client that is also an event recipient
-  (answers confirmed notifications from a background thread, or deliberately
-  does not).
-
-`aac_setup.py` is this example's numbers and is not for folding.
+The alarm and device-management encoders (`wiretest.alarm`: AcknowledgeAlarm,
+GetEventInformation and its ACK parser, DeviceCommunicationControl, TimeSynchronization,
+BACnetDestination, BACnetTimeStamp, `EventNotification`) and the Peer
+(`wiretest.Workstation`) come from the series harness, `wiretest/` 0.6.0. They started
+here and were folded into it. `aac_setup.py` holds this example's numbers.

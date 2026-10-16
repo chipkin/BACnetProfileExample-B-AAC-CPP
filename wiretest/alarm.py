@@ -2,26 +2,24 @@
 # Public-domain example code (CC0) - see ../LICENSE.
 """Encode and decode the alarm, event and device-management services a Wire Test needs.
 
-GENERIC - nothing here names B-AAC. It extends wiretest/codec.py (0.5.0, frozen this
-round) and is written to be folded into wiretest/ 0.6.0 as it stands:
-
     requests   acknowledge_alarm_request, get_event_information_request,
-               device_communication_control_request, time_synchronization,
-               simple_ack
-    values     application_date / application_time, context_date_time (a BACnetTimeStamp
-               as dateTime), destination (one BACnetDestination, cl. 21 production),
-               application_bit_string
+               device_communication_control_request, time_synchronization
+    values     context_date_time (a BACnetTimeStamp as dateTime), destination (one
+               BACnetDestination, cl. 21 production); the date / time / bit-string /
+               character-string encoders live in codec and are re-exported here
     decoding   EventNotification (Confirmed- or UnconfirmedEventNotification-Request),
-               parse_event_summaries (GetEventInformation-ACK)
+               parse_event_summaries (GetEventInformation-ACK), date_time_text
 
 Every production is from ANSI/ASHRAE 135-2024 clause 21 (21.2 confirmed services, 21.3
-unconfirmed services, 21.6 base types); service choices from 21.1.
+unconfirmed services, 21.6 base types); service choices from 21.1. Came from B-AAC's
+tests/alarm_codec.py (wiretest 0.6.0).
 """
 import struct
 
-from wiretest import codec
-from wiretest.codec import (closing, confirmed_request, context_object_id, context_unsigned, object_id, opening,
-                            read_tag)
+from . import codec
+from .codec import (application_bit_string, application_date, application_time,  # noqa: F401 (re-exported)
+                    closing, confirmed_request, context_character_string, context_enumerated,
+                    context_object_id, context_unsigned, opening, read_tag, simple_ack)
 
 # BACnetConfirmedServiceChoice / BACnetUnconfirmedServiceChoice (cl. 21).
 SERVICE_ACKNOWLEDGE_ALARM = 0
@@ -51,13 +49,13 @@ DCC_DISABLE_INITIATION = 2
 
 # Error classes and codes (cl. 21 BACnetErrorClass / BACnetErrorCode).
 ERROR_CLASS_SECURITY = 4
-ERROR_CLASS_SERVICES = 5
+ERROR_CLASS_SERVICES = codec.ERROR_CLASS_SERVICES
 ERROR_CODE_INVALID_TIMESTAMP = 14
 ERROR_CODE_PASSWORD_FAILURE = 26
 
 # Properties.
 PROPERTY_ACKED_TRANSITIONS = 0
-PROPERTY_EVENT_STATE = 36
+PROPERTY_EVENT_STATE = codec.PROPERTY_EVENT_STATE
 PROPERTY_EVENT_TIME_STAMPS = 130
 PROPERTY_LOCAL_DATE = 56
 PROPERTY_LOCAL_TIME = 57
@@ -68,41 +66,11 @@ PROPERTY_RECIPIENT_LIST = 102
 # Values
 # ---------------------------------------------------------------------------
 
-def application_date(year, month, day, weekday):
-    """Date (cl. 20.2.12): year - 1900, month, day, weekday 1 = Monday .. 7 = Sunday."""
-    return bytes([0xA4, year - 1900, month, day, weekday])
-
-
-def application_time(hour, minute, second, hundredths=0):
-    return bytes([0xB4, hour, minute, second, hundredths])
-
-
-def application_bit_string(bits):
-    """BIT STRING (cl. 20.2.10), bit 0 first."""
-    octets = bytearray((len(bits) + 7) // 8)
-    for index, bit in enumerate(bits):
-        if bit:
-            octets[index // 8] |= 0x80 >> (index % 8)
-    body = bytes([len(octets) * 8 - len(bits)]) + bytes(octets)
-    return bytes([0x80 | len(body)]) + body
-
-
 def context_date_time(tag, date_time):
     """A BACnetTimeStamp in its dateTime form ([2] BACnetDateTime) inside context tag `tag`.
     `date_time` is the (date octets, time octets) pair EventNotification.time_stamp holds."""
     date_octets, time_octets = date_time
     return opening(tag) + opening(2) + bytes([0xA4]) + date_octets + bytes([0xB4]) + time_octets + closing(2) + closing(tag)
-
-
-def context_character_string(tag, text):
-    body = b"\x00" + text.encode("utf-8")
-    if len(body) < 5:
-        return bytes([(tag << 4) | 0x08 | len(body)]) + body
-    return bytes([(tag << 4) | 0x08 | 5, len(body)]) + body
-
-
-def context_enumerated(tag, value):
-    return context_unsigned(tag, value)   # same octets: context tags carry no type
 
 
 def destination(mac, process_identifier, confirmed, transitions=(True, True, True), network_number=0,
@@ -148,20 +116,9 @@ def time_synchronization(year, month, day, weekday, hour, minute, second=0):
             application_time(hour, minute, second))
 
 
-def simple_ack(invoke_id, service):
-    return bytes([0x20, invoke_id, service])
-
-
 # ---------------------------------------------------------------------------
 # Decoding
 # ---------------------------------------------------------------------------
-
-def _tags(octets, position=0):
-    while position < len(octets):
-        start = position
-        number, is_context, kind, body, position = read_tag(octets, position)
-        yield start, number, is_context, kind, body, position
-
 
 def _skip_constructed(octets, position):
     """Position just after the closing tag that matches an opening tag already read."""

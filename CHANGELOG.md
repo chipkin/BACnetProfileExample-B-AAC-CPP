@@ -12,6 +12,7 @@ Peer and the Wire Tests prove it (series glossary, `docs/GLOSSARY.md`).
 
 ### Added
 
+- Wire Tests use the shared `wiretest/` 0.6.0: `tests/alarm_codec.py` and `tests/workstation.py` are folded into it as `wiretest.alarm` and `wiretest.Workstation`.
 - **Wire Tests for the Profile Function**, against a Python operator workstation
   (`tests/workstation.py`) that is both a client and an event recipient:
   `alarm_test.py` (26 checks: `Recipient_List` write, a confirmed alarm at the

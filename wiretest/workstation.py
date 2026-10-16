@@ -2,11 +2,10 @@
 # Public-domain example code (CC0) - see ../LICENSE.
 """A Python-simulated operator workstation: a client that is ALSO an event recipient.
 
-GENERIC - nothing here names B-AAC; written to be folded into wiretest/ 0.6.0 beside
-peer.SimulatedDevice. wiretest.Client waits for one answer at a time and drops what else
-arrives, so it cannot be a notification recipient: the device's ConfirmedEventNotification
-has to be answered within the device's APDU_Timeout whatever the test is doing at that
-moment. Workstation owns one UDP socket and, in a background thread:
+wiretest.Client waits for one answer at a time and drops what else arrives, so it cannot
+be a notification recipient: the device's ConfirmedEventNotification has to be answered
+within the device's APDU_Timeout whatever the test is doing at that moment. Workstation
+owns one UDP socket and, in a background thread:
 
   - keeps every Confirmed/UnconfirmedEventNotification it receives (`notifications`) and
     answers each confirmed one with a SimpleACK (cl. 13.8.2) - unless `answer_notifications`
@@ -15,17 +14,15 @@ moment. Workstation owns one UDP socket and, in a background thread:
     request waiting for its invoke id.
 
 `request()` / `read_property()` / `write_property()` work as wiretest.Client's do, and
-return the same wiretest.Answer.
+return the same wiretest.Answer. Came from B-AAC's tests/workstation.py (wiretest 0.6.0).
 """
 import select
 import socket
 import threading
 import time
 
-from wiretest import codec
-from wiretest.client import Answer
-
-import alarm_codec
+from . import alarm, codec
+from .client import Answer
 
 RESPONSE_TYPES = (codec.PDU_SIMPLE_ACK, codec.PDU_COMPLEX_ACK, codec.PDU_ERROR, codec.PDU_REJECT, codec.PDU_ABORT)
 
@@ -36,7 +33,7 @@ class Workstation:
         self.sock.bind((bind_ip, port))
         self.ip, self.port = self.sock.getsockname()
         self.answer_notifications = answer_notifications
-        self.notifications = []      # every EventNotification received, in order (alarm_codec.EventNotification)
+        self.notifications = []      # every EventNotification received, in order (alarm.EventNotification)
         self._responses = []
         self._invoke_id = 0
         self._lock = threading.Lock()
@@ -68,20 +65,20 @@ class Workstation:
             try:
                 data, source = self.sock.recvfrom(2048)
             except ConnectionResetError:
-                continue   # Windows: ICMP port-unreachable for an earlier send (see wiretest/endpoint.py)
+                continue   # Windows: ICMP port-unreachable for an earlier send (see endpoint.py)
             except OSError:
                 return
             frame = codec.Frame(data, source)
             if not frame.ok or frame.network_message is not None:
                 continue
-            if alarm_codec.is_event_notification(frame):
-                notification = alarm_codec.EventNotification(frame)
+            if alarm.is_event_notification(frame):
+                notification = alarm.EventNotification(frame)
                 with self._arrived:
                     self.notifications.append(notification)
                     self._arrived.notify_all()
                 if notification.confirmed and self.answer_notifications:
-                    self.sock.sendto(codec.bvlc(codec.npdu(alarm_codec.simple_ack(
-                        frame.invoke_id, alarm_codec.SERVICE_CONFIRMED_EVENT_NOTIFICATION))), source)
+                    self.sock.sendto(codec.bvlc(codec.npdu(codec.simple_ack(
+                        frame.invoke_id, alarm.SERVICE_CONFIRMED_EVENT_NOTIFICATION))), source)
             elif frame.pdu_type in RESPONSE_TYPES:
                 with self._arrived:
                     self._responses.append(frame)
