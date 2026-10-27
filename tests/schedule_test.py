@@ -3,7 +3,7 @@
 # Public-domain example code (CC0) - see ../LICENSE.
 """B-AAC Wire Test - the workstation sets the controller's clock, and the local schedule follows it.
 
-    python3 tests/schedule_test.py [--exe build/BACnetExampleBAAC] [--port 47821]
+    python3 tests/schedule_test.py [--exe build/BACnetExampleBAAC] [--port 47829]
 
 135-2024 L.4.2: "Ability to schedule actions in the local device based on date and time"
 (SCHED-I-B) and "Ability to synchronize its internal clock upon request" (DM-TS-B). The

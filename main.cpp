@@ -34,7 +34,8 @@
 // Notification Class that routes its alarms, and a Schedule + Calendar pair.
 // Each object has a colour name (the convention shared across this example series):
 //
-//     Device 389004            "Chipkin Example B-AAC"     (instance configurable with --deviceID)
+//     Device 389004            "Chipkin Example B-AAC"     (instance configurable with --deviceID,
+//                                                          Object_Name with --deviceName)
 //     Analog Input  1          "Bronze"      (REAL, degrees Celsius; read-only)
 //     Binary Input  1          "Emerald"     (active / inactive; read-only)
 //     Multi-State Input 1      "Hot Pink"    (state 1..3; read-only)
@@ -77,7 +78,7 @@
 // up/down = nudge Analog Input 1 by +/-1.1, s = advance Schedule 1 ("Saffron")
 // with a Weekly_Schedule transition for right now. To fire an alarm, WriteProperty
 // the Analog Value's Present_Value above 90 or below 10. Command line: --port <n>,
-// --deviceID <n>, --dcc-password <string>.
+// --deviceID <n>, --deviceName <text>, --dcc-password <string>, --xml.
 //
 // All the UDP/stack plumbing lives in common/CASExampleHelper so this file can
 // stay focused on the BACnet logic.
@@ -106,7 +107,7 @@ using namespace CASBACnetStackExampleConstants;
 // 1. Example + device configuration
 // -----------------------------------------------------------------------------
 static const char* APP_NAME = "BACnet B-AAC (Advanced Application Controller) Example - C++";
-static const char* APP_VERSION = "1.4.0";
+static const char* APP_VERSION = "1.5.0";
 
 // The device instance. BACnet requires this to be configurable, so it defaults
 // to 389004 and can be overridden on the command line with --deviceID.
@@ -129,16 +130,19 @@ static uint32_t g_deviceInstance = 389004;
 // Update VENDOR_NAME below to match.
 static const uint32_t VENDOR_IDENTIFIER = 389;
 
-// The Device object's Object_Name.
+// The Device object's Object_Name - the DEFAULT one.
 //
 // THIS IS THE ONE THAT WILL BITE YOU. Object_Name must be unique across the
-// whole BACnet internetwork, and here it is a COMPILE-TIME constant. The device
-// instance is runtime-configurable via --deviceID, but Object_Name is not: ship
-// two units, configure their instances correctly, and both still announce
-// Object_Name "Chipkin Example B-AAC" - a spec violation, and a hard BTL failure. In a real
-// product Object_Name must be per-unit configurable too: derive it from a serial
-// number, DIP switches, a config file, or add a --deviceName argument.
+// whole BACnet internetwork (cl. 12.1.1.4), so it must be per-unit configurable,
+// exactly like the instance. This example takes it at start-up with
+// --deviceName <text> (common/ ParseDeviceNameArg, read into g_deviceName in
+// main()); DEVICE_NAME is only what a unit announces when nobody configured it.
+// Ship two units without --deviceName and BOTH announce the same Object_Name -
+// a spec violation, and a hard BTL failure. In your product, configure the name
+// per unit (a serial number, DIP switches, a config file, or this argument) and
+// change the default below to something that says "not configured yet".
 static const char* DEVICE_NAME = "Chipkin Example B-AAC";
+static const char* g_deviceName = DEVICE_NAME; // --deviceName, or the default
 
 // The Device object's Description. Change it to what YOUR device actually is;
 // this string describes this tutorial.
@@ -762,7 +766,7 @@ bool GetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectT
     // Object_Name - the colour name for each object.
     if (propertyIdentifier == PROPERTY_IDENTIFIER_OBJECT_NAME) {
         if (objectType == OBJECT_TYPE_DEVICE && objectInstance == g_deviceInstance) {
-            return ReturnCharacterString(DEVICE_NAME, value, valueElementCount, maxElementCount, encodingType);
+            return ReturnCharacterString(g_deviceName, value, valueElementCount, maxElementCount, encodingType);
         }
         if (objectType == OBJECT_TYPE_ANALOG_INPUT && objectInstance == ANALOG_INPUT_INSTANCE) {
             return ReturnCharacterString("Bronze", value, valueElementCount, maxElementCount, encodingType);
@@ -1336,12 +1340,19 @@ int main(int argc, char** argv) {
     // --- Command line + version --------------------------------------------
     // --help / --version print and exit, so handle them before we bind a socket
     // or touch the stack.
-    if (CASExampleHelper::HandleHelpAndVersionArgs(argc, argv, APP_NAME, APP_VERSION)) {
+    // The help lists exactly the options this example reads: --dcc-password (a
+    // B-AAC executes DeviceCommunicationControl and ReinitializeDevice),
+    // --deviceName and --xml (below).
+    if (CASExampleHelper::HandleHelpAndVersionArgs(argc, argv, APP_NAME, APP_VERSION,
+                                                   true,    // --dcc-password
+                                                   true)) { // --deviceName
         return 0;
     }
     const uint16_t port = CASExampleHelper::ParsePortArg(argc, argv, 47808);
     g_deviceInstance = CASExampleHelper::ParseDeviceIdArg(argc, argv, g_deviceInstance);
+    g_deviceName = CASExampleHelper::ParseDeviceNameArg(argc, argv, DEVICE_NAME);
     g_dccPassword = CASExampleHelper::ParseDccPasswordArg(argc, argv, DEFAULT_DCC_PASSWORD);
+    CASExampleHelper::ParseXmlLogArg(argc, argv); // --xml: dump every RX/TX frame as XML instead of one line (off by default)
     CASExampleHelper::PrintVersion(APP_NAME, APP_VERSION);
     if (g_dccPassword[0] != '\0') {
         // Say THAT a password is set, never what it is.
@@ -1749,7 +1760,7 @@ int main(int argc, char** argv) {
                           true /*broadcast*/, 0, NULL, 0);
 
     printf("FYI: Device %u (\"%s\") ready. Vendor ID %u. Press 'h' for help.\n",
-           g_deviceInstance, DEVICE_NAME, VENDOR_IDENTIFIER);
+           g_deviceInstance, g_deviceName, VENDOR_IDENTIFIER);
 
     // --- Run the stack ------------------------------------------------------
     // BACnetStack_Tick() processes incoming messages and timers. Call it

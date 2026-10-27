@@ -32,6 +32,7 @@ from wiretest import alarm as alarm_codec  # noqa: E402
 # Match main.cpp.
 DEVICE_INSTANCE = 389004
 DEVICE = (wiretest.OBJECT_TYPE_DEVICE, DEVICE_INSTANCE)
+ERROR_CLASS_OBJECT, ERROR_CODE_UNKNOWN_OBJECT = 1, 31
 OBJECT_TYPE_ANALOG_VALUE = 2
 OBJECT_TYPE_CALENDAR = 6
 OBJECT_TYPE_NOTIFICATION_CLASS = 15
@@ -60,7 +61,7 @@ def parser(description):
     arguments = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
     arguments.add_argument("--exe", default=str(wiretest.default_exe(REPOSITORY, "BACnetExampleBAAC")),
                            help="path to BACnetExampleBAAC (default: build/BACnetExampleBAAC)")
-    arguments.add_argument("--port", type=int, default=47821, help="the controller's UDP port (default 47821)")
+    arguments.add_argument("--port", type=int, default=47829, help="the controller's UDP port (default 47829)")
     return arguments
 
 

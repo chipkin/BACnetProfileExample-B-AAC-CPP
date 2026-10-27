@@ -3,7 +3,7 @@
 # Public-domain example code (CC0) - see ../LICENSE.
 """B-AAC Wire Test - DeviceCommunicationControl silences the controller's alarms, with a password.
 
-    python3 tests/dcc_test.py [--exe build/BACnetExampleBAAC] [--port 47821]
+    python3 tests/dcc_test.py [--exe build/BACnetExampleBAAC] [--port 47829]
 
 135-2024 L.4.2: "Ability to respond to communication control messages" (DM-DCC-B). The
 controller is started with --dcc-password olive. Cl. 16.1.2: with DISABLE_INITIATION

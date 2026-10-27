@@ -22,17 +22,17 @@
         "System_Status",
         "Max_APDU_Length_Accepted",
         "Segmentation_Supported",
-        "APDU_Timeout",
-        "Database_Revision"
+        "APDU_Timeout"
       ],
-      "note": "the device itself; the instance is configurable with --deviceID. The stack rows are device-wide facts only the stack knows - the protocol version and revision it implements, the services and object types it was configured with, the live object list and address-binding table. The accepted rows are the stack's configured defaults for APDU limits, segmentation, system status and database revision; an application that answered them from its own constants could contradict the stack, so this example does not - except Number_Of_APDU_Retries: the stack reads it through the app's callback when it retries a confirmed request (a ConfirmedEventNotification to a silent recipient), and its default 0 means no retries, so the app serves 3 (the 12.11.29 suggested default). Local_Date and Local_Time (required because the device executes TimeSynchronization) come from the app's device clock - the host wall clock plus the last time sync's correction - and drive the stack's Schedule and Calendar engines",
+      "note": "the device itself; the instance is configurable with --deviceID and the Object_Name with --deviceName (both at start-up; the heading shows the defaults). The stack rows are device-wide facts only the stack knows - the protocol version and revision it implements, the services and object types it was configured with, the live object list and address-binding table, and Database_Revision, which the stack starts at 0 and increments for each object added at start-up: it reads 12 (the Device and its eleven objects) and stays 12, because nothing creates, deletes or renames an object afterwards (a command, a Schedule write, a Recipient_List write, an alarm or a DeviceCommunicationControl changes no object). The accepted rows are the stack's configured defaults for APDU limits, segmentation and system status; an application that answered them from its own constants could contradict the stack, so this example does not - except Number_Of_APDU_Retries: the stack reads it through the app's callback when it retries a confirmed request (a ConfirmedEventNotification to a silent recipient), and its default 0 means no retries, so the app serves 3 (the 12.11.29 suggested default). Local_Date and Local_Time (required because the device executes TimeSynchronization) come from the app's device clock - the host wall clock plus the last time sync's correction - and drive the stack's Schedule and Calendar engines",
       "stack": [
         "Object_List",
         "Protocol_Version",
         "Protocol_Revision",
         "Protocol_Services_Supported",
         "Protocol_Object_Types_Supported",
-        "Device_Address_Binding"
+        "Device_Address_Binding",
+        "Database_Revision"
       ]
     },
     {

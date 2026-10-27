@@ -17,7 +17,7 @@ python3 tests/run_wire_tests.py --exe build/BACnetExampleBAAC
 
 On Windows, `--exe build\Release\BACnetExampleBAAC.exe` (or wherever your build
 put it). It ends with `ALL WIRE TESTS PASSED` (exit 0) or the scripts that failed.
-`--port` (default 47821) is the UDP port the test starts the example on. The run
+`--port` (default 47829) is the UDP port the test starts the example on. The run
 takes a little over a minute; `silent_recipient_test.py` is most of it. Each script
 also runs on its own with the same arguments. CI (`.github/workflows/release.yml`)
 runs them on Linux after the smoke test.
@@ -47,7 +47,8 @@ recipient lists", "Ability to respond to communication control messages" and
 
 | Script | Checks | What it proves |
 |---|---:|---|
-| `discovery_test.py` | 18 | Every listed property of every object reads as a value (Who-Is, `Object_List`, each `Property_List`) |
+| `discovery_test.py` | 19 | Every listed property of every object reads as a value (Who-Is, `Object_List`, each `Property_List`); Device `Database_Revision` reads 12, one per object added at start-up |
+| `configuration_test.py` | 18 | The Device's identity is configurable at start-up (`--deviceID`, `--deviceName`; cl. 12.1.1.3, 12.1.1.4): with no options the defaults; with `--deviceID 389904 --deviceName "Chipkin Example B-AAC Unit 2"` Who-Is, ReadProperty `Object_Name`, the ready line and Who-Has by name all see the configured identity, and Device 389004 is gone; an empty or 256-byte name keeps the default with a warning, a 255-byte one is kept whole; `--help` lists `--port`, `--deviceID`, `--deviceName`, `--dcc-password` and `--xml`, and `--xml` prints each frame as XML |
 | `alarm_test.py` | 26 | The alarm path end to end: `Recipient_List` write (AE-CRL-B); a confirmed out-of-range alarm reaches the workstation (AE-N-I-B); `Event_State`, `Acked_Transitions` and GetEventInformation agree (AE-INFO-B); a stale acknowledgment is refused with `invalid-timestamp`; the real one is SimpleACKed, sets the bit and sends an ACK_NOTIFICATION (AE-ACK-B); an unacknowledged return to normal stays listed; rewriting the list to a second workstation moves the next alarm there and not to the first |
 | `silent_recipient_test.py` | 7 | Failure Mode: a recipient that never SimpleACKs gets the same notification (same invoke id) 1 + `Number_Of_APDU_Retries` (3) times, `APDU_Timeout` (10 s) apart, then no more; the alarm stays listed, unacknowledged |
 | `dcc_test.py` | 10 | Failure Mode: DCC with a wrong or missing password and ReinitializeDevice with a wrong one get `security` / `password-failure`, and the controller keeps alarming; the right password's `disable-initiation` stops the next notification while the controller still answers; `enable` brings notifications back (DM-DCC-B) |

@@ -3,7 +3,7 @@
 This example performs the B-AAC Profile Function - alarms directed to a
 recipient, acknowledgments tracked, a local schedule driven by a synchronised
 clock - through the customer interface of the CAS BACnet Stack (`6.x` @
-`64b2cfac5`), and the Wire Tests in [`tests/`](tests/README.md) prove it against a
+`69b6249f`), and the Wire Tests in [`tests/`](tests/README.md) prove it against a
 Python operator workstation. The items below are what it does not do, or what
 the stack does differently from what one might expect. Re-check them whenever
 the Stack Pin moves.
@@ -19,7 +19,7 @@ clock that `Local_Date` / `Local_Time` report (`g_clockOffsetSeconds`,
 stamps come from `CallbackGetSystemTime`, which `common/CASExampleHelper.cpp`
 registers and which returns the host clock. After a sync the two disagree. The
 fix is to register a `GetSystemTime` that adds the offset - a `common/` change
-(frozen for this round), or an override registered after
+(vendored, shared by the whole series), or an override registered after
 `RegisterCommonCallbacks()`. The Wire Tests take every time stamp from the
 notification itself, so they do not depend on either clock.
 

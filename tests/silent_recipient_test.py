@@ -3,7 +3,7 @@
 # Public-domain example code (CC0) - see ../LICENSE.
 """B-AAC Wire Test - Failure Mode: the operator workstation has gone silent.
 
-    python3 tests/silent_recipient_test.py [--exe build/BACnetExampleBAAC] [--port 47821]
+    python3 tests/silent_recipient_test.py [--exe build/BACnetExampleBAAC] [--port 47829]
 
 The workstation puts itself on Notification Class 1's Recipient_List for CONFIRMED
 notifications and then stops answering - its SimpleACKs never come (a crashed or

@@ -1,0 +1,303 @@
+{
+  "bibbs": [
+    {
+      "enabled": true,
+      "id": "DS-RP-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DS-RPM-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DS-WP-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DS-WPM-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "AE-N-I-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "AE-ACK-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "AE-INFO-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "AE-CRL-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "SCHED-I-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DM-DDB-A",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DM-DDB-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DM-DOB-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DM-DCC-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DM-TS-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DM-UTC-B",
+      "provenance": "user-entered"
+    },
+    {
+      "enabled": true,
+      "id": "DM-RD-B",
+      "provenance": "user-entered"
+    }
+  ],
+  "epicsHeader": {
+    "characterSetsSupported": {
+      "provenance": "derived",
+      "value": "ISO 10646 (UTF-8) / ANSI X3.4"
+    },
+    "dataLinkOptions": {
+      "provenance": "derived",
+      "value": "BACnet IP, (Annex J)"
+    },
+    "deviceProfile": {
+      "provenance": "user-entered",
+      "value": "B-AAC - BACnet Advanced Application Controller"
+    },
+    "productDescription": {
+      "provenance": "user-entered",
+      "value": "A BACnet/IP device built on the CAS BACnet Stack that implements as much of the B-AAC profile as the stack supports today. It presents three read-only sensor objects, three commandable output objects, an alarm-capable Analog Value with an intrinsic OutOfRange algorithm, the Notification Class that routes its alarms (with a writable Recipient_List), an internal Schedule that writes a target object on a weekly basis and on the dates in a stack-held Calendar, and the required Network Port. It answers ReadProperty / ReadPropertyMultiple, accepts WriteProperty / WritePropertyMultiple, AcknowledgeAlarm, DeviceCommunicationControl, ReinitializeDevice and time synchronization (which sets the device clock that Local_Date / Local_Time report and the Schedule and Calendar follow), and is discoverable by Who-Is / I-Am and Who-Has / I-Have. It is a tutorial for implementers of the B-AAC profile. Its Wire Tests prove the profile's function against a Python operator workstation: a confirmed alarm reaches the recipient a Recipient_List write names, is acknowledged (a stale time stamp is refused with invalid-timestamp), stays listed by GetEventInformation until acknowledged, is retransmitted 3 times (Number_Of_APDU_Retries) to a silent recipient, and is silenced by DCC disable-initiation; a time sync moves the Schedule and Calendar."
+    },
+    "productName": {
+      "provenance": "user-entered",
+      "value": "CAS BACnet Stack Example - B-AAC"
+    },
+    "specialFunctionality": {
+      "provenance": "derived",
+      "value": "none"
+    }
+  },
+  "identityMutations": [
+    {
+      "included": true,
+      "notes": "The Device object is the only object whose identity can change, and only by start-up configuration: restart the example with --deviceID <n> or --deviceName <text>. A WriteProperty to the Device's Object_Name or Object_Identifier is refused (write-access-denied), so nothing changes over the network.",
+      "objectIdentifier": {
+        "instance": 389004,
+        "type": "device"
+      },
+      "provenance": "user-entered",
+      "safeAlternateObjectIdentifier": {
+        "instance": 389904,
+        "type": "device"
+      },
+      "safeAlternateObjectName": "Chipkin Example B-AAC Alt"
+    }
+  ],
+  "infra": {
+    "dccPassword": {
+      "provenance": "user-entered",
+      "value": "Chipkin-DCC-42"
+    },
+    "failTimes": {
+      "provenance": "derived",
+      "value": [
+        [
+          "Notification Fail Time",
+          60
+        ],
+        [
+          "Internal Processing Fail Time",
+          2
+        ],
+        [
+          "Minimum ON/OFF Time",
+          2
+        ],
+        [
+          "Schedule Evaluation Fail Time",
+          2
+        ],
+        [
+          "External Command Fail Time",
+          5
+        ],
+        [
+          "Program Object State Change Fail Time",
+          5
+        ],
+        [
+          "Acknowledgement Fail Time",
+          2
+        ],
+        [
+          "Slave Proxy Confirm Interval",
+          6
+        ],
+        [
+          "Unconfirmed Response Fail Time",
+          4
+        ],
+        [
+          "Activate Changes Fail Time",
+          30
+        ],
+        [
+          "Auto Negotiation Fail Time",
+          15
+        ],
+        [
+          "Foreign Device Registration Fail Time",
+          10
+        ],
+        [
+          "Channel Write Fail Time",
+          30
+        ]
+      ]
+    },
+    "networkPortInstance": {
+      "provenance": "captured",
+      "value": 1
+    },
+    "rebootWindow": {
+      "provenance": "derived",
+      "value": {
+        "activateChangesMs": 30000,
+        "coldstartMs": 60000,
+        "warmstartMs": 30000
+      }
+    },
+    "reinitializePassword": {
+      "provenance": "user-entered",
+      "value": "Chipkin-DCC-42"
+    },
+    "timeouts": {
+      "provenance": "derived",
+      "value": {
+        "apdu": 3000,
+        "reply": 1000,
+        "segment": 1000
+      }
+    },
+    "valueRestrictions": {
+      "provenance": "derived",
+      "value": [
+        {
+          "datatype": "unsigned-integer",
+          "kind": "range",
+          "max": 65535,
+          "min": 0
+        },
+        {
+          "datatype": "signed-integer",
+          "kind": "range",
+          "max": 2147483647,
+          "min": -2147483648
+        },
+        {
+          "datatype": "real",
+          "kind": "range",
+          "max": 3.4e+38,
+          "min": -3.4e+38,
+          "resolution": 0.01
+        },
+        {
+          "datatype": "character-string",
+          "kind": "length",
+          "max": 64
+        },
+        {
+          "datatype": "octet-string",
+          "kind": "length",
+          "max": 256
+        },
+        {
+          "datatype": "list",
+          "kind": "length",
+          "max": 10
+        }
+      ]
+    }
+  },
+  "snapshotCapturedAt": "2026-10-21T23:55:52.492Z",
+  "testPoints": [
+    {
+      "included": true,
+      "kind": "commandable",
+      "objectIdentifier": {
+        "instance": 1,
+        "type": "analogOutput"
+      },
+      "propertyIdentifier": "presentValue",
+      "provenance": "user-entered",
+      "suggestedTestValue": 24,
+      "writePriority": 7
+    },
+    {
+      "included": true,
+      "kind": "commandable",
+      "objectIdentifier": {
+        "instance": 1,
+        "type": "binaryOutput"
+      },
+      "propertyIdentifier": "presentValue",
+      "provenance": "user-entered",
+      "suggestedTestValue": 1,
+      "writePriority": 16
+    },
+    {
+      "included": true,
+      "kind": "commandable",
+      "objectIdentifier": {
+        "instance": 1,
+        "type": "multiStateOutput"
+      },
+      "propertyIdentifier": "presentValue",
+      "provenance": "user-entered",
+      "suggestedTestValue": 2,
+      "writePriority": 16
+    },
+    {
+      "included": true,
+      "kind": "writable",
+      "objectIdentifier": {
+        "instance": 1,
+        "type": "analogValue"
+      },
+      "propertyIdentifier": "presentValue",
+      "provenance": "user-entered",
+      "suggestedTestValue": 50
+    }
+  ],
+  "updatedAt": "2026-10-21T23:55:52.492Z"
+}

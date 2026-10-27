@@ -62,8 +62,8 @@ commands above.
 ## Run
 
 ```bash
-./build/BACnetExampleBAAC [--port 47808] [--deviceID 389004]   # Linux/macOS
-.\build\Release\BACnetExampleBAAC.exe [--port 47808] [--deviceID 389004]   # Windows
+./build/BACnetExampleBAAC [--port 47808] [--deviceID 389004] [--deviceName "Chipkin Example B-AAC"]   # Linux/macOS
+.\build\Release\BACnetExampleBAAC.exe [--port 47808] [--deviceID 389004] [--deviceName "Chipkin Example B-AAC"]   # Windows
 ```
 
 Interactive keys while running: `h` help, `q` quit, up/down nudge Analog Input 1,

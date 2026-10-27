@@ -26,7 +26,9 @@ string in `GetPropertyCharString`).
 **Change the device identity before you ship** - vendor ID, vendor name, model
 name, description, firmware revision, DCC password, and device name are all in
 the `CHANGE ALL OF THIS BEFORE YOU SHIP` block at the top of `main.cpp`, with a
-per-field note on each saying what to change it to. That block is the
+per-field note on each saying what to change it to. The device name there
+is only the default: each unit takes its own with `--deviceName` at start-up, as
+it takes its instance with `--deviceID`. That block is the
 authoritative checklist; it is in the source rather than here so it cannot be
 skipped by someone who only reads the code.
 
@@ -182,7 +184,7 @@ not in `accepted`, comes out as a ⚠ row - that is a defect, not a feature.
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| On start-up the app prints a wall of red `Error:` lines but the device works | **Expected - this is not your bug.** Two benign sources, both from the stack's own debug logging: (1) the device receives its **own** broadcast I-Am and logs a decode cascade (*"Services is not supported service=[0]"* … *"Failed to process the incoming NPDU"*) - any BACnet/IP device that listens for broadcasts hears itself; (2) a one-time *"UUID has not been set. A UUID must be set for the BACnetSC device to start."* - the stack starts a BACnet/SC datalink these IP-only examples never configure. It appears once and does not spam. On a healthy start-up roughly half the output is these lines. |
+| On start-up the app prints a few red `Error:` lines but the device works | **Expected - this is not your bug.** The device receives its **own** broadcast I-Am and logs a decode cascade (*"Services is not supported service=[0]"* … *"Failed to process the incoming NPDU"*) - any BACnet/IP device that listens for broadcasts hears itself. On a quiet network there may be none. (The one-time BACnet/SC "UUID has not been set" notice earlier versions printed no longer appears.) |
 | CMake error: *"CAS BACnet Stack adapter not found under: ..."* | Submodules not initialized. Run `git submodule update --init --recursive` (or pass `-D CAS_STACK_DIR=...`). |
 | `CASBACnetStackDLL.h: No such file or directory` | Same - submodules not checked out. |
 | Windows: *"No CMAKE_CXX_COMPILER could be found"* | Install Visual Studio with the "Desktop development with C++" workload, then re-run from a fresh terminal. |

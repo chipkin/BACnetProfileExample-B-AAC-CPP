@@ -3,7 +3,7 @@
 # Public-domain example code (CC0) - see ../LICENSE.
 """B-AAC Wire Test - the controller raises an alarm to an operator workstation and tracks its acknowledgment.
 
-    python3 tests/alarm_test.py [--exe build/BACnetExampleBAAC] [--port 47821]
+    python3 tests/alarm_test.py [--exe build/BACnetExampleBAAC] [--port 47829]
 
 The Profile Function (135-2024 L.4.2, Alarm and Event Management): "Generation of limited
 alarm and event notifications and the ability to direct them to recipients" and "Tracking
