@@ -3,7 +3,7 @@
 This example performs the B-AAC Profile Function - alarms directed to a
 recipient, acknowledgments tracked, a local schedule driven by a synchronised
 clock - through the customer interface of the CAS BACnet Stack (`6.x` @
-`69b6249f`), and the Wire Tests in [`tests/`](tests/README.md) prove it against a
+`1e7dffe2b`, example v1.5.1), and the Wire Tests in [`tests/`](tests/README.md) prove it against a
 Python operator workstation. The items below are what it does not do, or what
 the stack does differently from what one might expect. Re-check them whenever
 the Stack Pin moves.
@@ -23,19 +23,17 @@ fix is to register a `GetSystemTime` that adds the offset - a `common/` change
 `RegisterCommonCallbacks()`. The Wire Tests take every time stamp from the
 notification itself, so they do not depend on either clock.
 
-## 2. Writing an empty Recipient_List is refused
+## 2. Writing an empty Recipient_List
 
-Filed: [#3959](https://github.com/chipkin/cas-bacnet-stack/issues/3959).
+Filed: [#3959](https://github.com/chipkin/cas-bacnet-stack/issues/3959) (closed).
 
-**Status: stack behaviour, observed; not confirmed as a defect.** WriteProperty of
-Notification Class 1 `Recipient_List` with an empty list (an opening and closing
-tag [3] with nothing between) is answered Error `property` /
-`invalid-data-type` (class 2, code 9). The stack's log says
-`BACnetBusinessLogic::SetProperty() ... Invalid datatype=[255]` - it takes the
-datatype from the first element and there is none. Writing a list that names a
-recipient works, so a workstation can still redirect alarms (`alarm_test.py`
-section 8 does). 135-2024 has no sentence found that says an empty BACnetLIST
-must be writable; the coordinator decides whether to file it.
+**Status: reported fixed in the stack; not re-checked in this example.** An
+earlier stack answered a WriteProperty of Notification Class 1 `Recipient_List`
+with an empty list (an opening and closing tag [3] with nothing between) with
+Error `property` / `invalid-data-type`. The stack fix for #3959 (an empty list
+clears the recipients, cl. 12.21.8) is in this pin, but no Wire Test writes an
+empty list, so this example has not confirmed it. Writing a list that names a
+recipient works (`alarm_test.py` section 8).
 
 ## 3. Alarms raised during DCC disable-initiation are not sent later
 
@@ -60,34 +58,3 @@ Analog Value). The stack exposes ~19 `SetIntrinsic*Algorithm` functions
 (ChangeOfState, ChangeOfValue, FloatingLimit, CommandFailure, BufferReady, ...).
 A richer B-AAC could arm several object types. Left as a single, clear example
 on purpose.
-
-## 6. Stack documentation gap - filed as [#3958](https://github.com/chipkin/cas-bacnet-stack/issues/3958)
-
-**The Schedule and Calendar engines read the Device's `Local_Date` /
-`Local_Time`, and the customer header does not say so.** `BACnetDBDevice::RunSchedule`
-and `GetLocalDateParts` (stack `source/BACnetDBDevice.cpp` at `64b2cfac5`)
-evaluate against those two Device properties, which the stack does not default
-(`docs/property-profile-reference.md`: "No default - a read fails with
-`value-not-initialized`"). The doc comments of `BACnetStack_AddScheduleObject`
-and `BACnetStack_AddCalendarObject` in `CASBACnetStackDLL.h` do not mention that
-the application must serve them with `CallbackGetPropertyDate` /
-`CallbackGetPropertyTime`. Up to 1.2.2 this example did not, so Schedule 1 never
-evaluated - its `Present_Value` read `property` / `value-not-initialized` and
-Chartreuse was never written - with no diagnostic. Evidence: the discovery Wire
-Test at 1.2.2 + this pin failed on Device 56, Device 57 and Schedule 1 property
-85, all Error class 2 code 72; with the two callbacks it passes 18/18.
-
-## 7. Number_Of_APDU_Retries defaults to 0 in the stack
-
-Filed as a documentation gap: [#3960](https://github.com/chipkin/cas-bacnet-stack/issues/3960) (0 is conformant; cl. 12.11.29 suggests 3).
-
-**Status: worked around here; stack default, noted for the series.** The stack's
-`CAS_BACNET_DEVICE_DEFAULT_NUMBER_OF_APDU_RETRIES` is 0 (`BACnetDBDevice.h` at
-`64b2cfac5`), and the stack reads the value through the application's
-`GetPropertyUnsignedInteger` when it retries a confirmed request. An example that
-does not serve it never retransmits a ConfirmedEventNotification (seen on the
-wire at 1.3.0: one transmission, no retry in 12 s). 135-2024 12.11.29 allows 0
-("If this device does not perform retries, then this property shall be set to
-zero") and suggests 3. This example serves 3 (`silent_recipient_test.py`).
-Every other example in the series that sends confirmed notifications or
-requests has the same default.

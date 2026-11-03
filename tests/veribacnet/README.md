@@ -34,14 +34,16 @@ identity string), change these files to match, the same way you would update
    this repository:
 
    ```
-   build\Release\BACnetExampleBAAC.exe --port 47829 --deviceID 389004
+   build\Release\BACnetExampleBAAC.exe --port 47829 --deviceID 389004 --dcc-password Chipkin-DCC-42
    ```
 
    Wait until it prints `FYI: Device 389004 ("Chipkin Example B-AAC") ready.`
    Use port 47829, not the standard 47808, so the test does not collide with
-   other BACnet software on the machine. Start it without `--dcc-password`
-   (the shipped default, no password): the project carries no
-   DeviceCommunicationControl or ReinitializeDevice password. Leave it running.
+   other BACnet software on the machine. Start it with `--dcc-password`: the
+   project's description carries that DeviceCommunicationControl and
+   ReinitializeDevice password (`testDatabase.passwords`), and the password
+   tests (9.24.2.x, 9.27.2.x) expect the device to refuse a wrong or missing
+   one. Leave it running.
 3. In a second terminal, from the root of this repository:
 
    ```

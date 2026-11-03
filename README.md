@@ -28,9 +28,9 @@ workstation - and the [Wire Tests](#wire-tests) prove it; see
 - **[docs/PICS.md](docs/PICS.md)** - the Protocol Implementation Conformance
   Statement: every object, every property, and who answers it.
 
-> **Versions:** this document describes **example v1.5.0**, built and verified
-> against **CAS BACnet Stack 6.0.23** (`6.x` @ `69b6249f`), at
-> **Protocol_Revision 30**, with the vendored `common/` helper at **v3.5.0**.
+> **Versions:** this document describes **example v1.5.1**, built and verified
+> against **CAS BACnet Stack 6.0.23** (`6.x` @ `1e7dffe2b`), at
+> **Protocol_Revision 30**, with the vendored `common/` helper at **v3.6.1**.
 > Running the example prints all three - if what it prints disagrees with this
 > line, trust the program and check `CHANGELOG.md`.
 
@@ -157,9 +157,9 @@ sees the alarm); point it at a specific client in `main.cpp`, or write the list.
 notifications must SimpleACK each one. If it does not, the controller sends it
 again after `APDU_Timeout` (10 s, the stack's value), up to
 `Number_Of_APDU_Retries` times. `main.cpp` serves that property as **3** (the
-135-2024 12.11.29 suggested default); left unserved it reads 0, which means "this
-device does not perform retries" - one lost datagram and the operator never sees
-the alarm.
+135-2024 12.11.29 suggested default, which is also the stack's own default);
+serving 0 means "this device does not perform retries" - one lost datagram and
+the operator never sees the alarm.
 
 **Acknowledgment is checked by the stack.** For an AcknowledgeAlarm the stack
 runs the 13.5.2 procedure: it refuses a `Time Stamp` that is not the latest one
@@ -255,9 +255,6 @@ Full detail and "what it would take" is in **[TODO.md](TODO.md)**.
   DCC `disable-initiation` a transition still happens (`Event_State`,
   `Acked_Transitions`, GetEventInformation all show it) but its notification is
   dropped, not queued; 135-2024 16.1.2 asks only that initiation stop.
-- **An empty `Recipient_List` cannot be written.** WriteProperty of an empty list
-  is answered `property` / `invalid-data-type` by the stack at this pin; write a
-  list naming a recipient instead. See TODO.md.
 - **One alarm source.** Only Analog Value 1 has event reporting.
 
 ## Requires the CAS BACnet Stack (licensed product)
@@ -345,9 +342,9 @@ CMake at it: `cmake -B build -S . -D CAS_STACK_DIR=/path/to/cas-bacnet-stack`.
 Expected output:
 
 ```
-BACnet B-AAC (Advanced Application Controller) Example - C++ v1.5.0
+BACnet B-AAC (Advanced Application Controller) Example - C++ v1.5.1
 CAS BACnet Stack version: 6.0.23.0
-Common helper (common/) version: 3.5.0
+Common helper (common/) version: 3.6.1
 FYI: Listening for BACnet/IP on UDP port 47808 (Network Port 1).
 TX 21 bytes to 192.168.3.255:47808 (broadcast) (Network Port 1) - Unconfirmed: I-Am
 TX 8 bytes to 192.168.3.255:47808 (broadcast) (Network Port 1) - Unconfirmed: Who-Is
@@ -475,7 +472,7 @@ There is one example repository per standardized device profile in ASHRAE 135-20
 
 | Profile | C++ | Node.js | C# | Rust | Python | Go |
 |---|---|---|---|---|---|---|
-| **B-LSC** Life Safety Controller | [B-LSC-CPP](https://github.com/chipkin/BACnetProfileExample-B-LSC-CPP) 🚧 | Ask | Ask | Ask | Ask | Ask |
+| **B-LSC** Life Safety Controller | [B-LSC-CPP](https://github.com/chipkin/BACnetProfileExample-B-LSC-CPP) | Ask | Ask | Ask | Ask | Ask |
 | **B-ALSC** Advanced Life Safety Controller | [B-ALSC-CPP](https://github.com/chipkin/BACnetProfileExample-B-ALSC-CPP) | Ask | Ask | Ask | Ask | Ask |
 
 ### Access control controllers (Annex L.6)
@@ -483,7 +480,7 @@ There is one example repository per standardized device profile in ASHRAE 135-20
 | Profile | C++ | Node.js | C# | Rust | Python | Go |
 |---|---|---|---|---|---|---|
 | **B-ACC** Access Control Controller | [B-ACC-CPP](https://github.com/chipkin/BACnetProfileExample-B-ACC-CPP) ⛔ blocked on [stack #2150](https://github.com/chipkin/cas-bacnet-stack/issues/2150), [#2044](https://github.com/chipkin/cas-bacnet-stack/issues/2044) | Ask | Ask | Ask | Ask | Ask |
-| **B-AACC** Advanced Access Control Controller | [B-AACC-CPP](https://github.com/chipkin/BACnetProfileExample-B-AACC-CPP) | Ask | Ask | Ask | Ask | Ask |
+| **B-AACC** Advanced Access Control Controller | [B-AACC-CPP](https://github.com/chipkin/BACnetProfileExample-B-AACC-CPP) ⛔ blocked on [stack #2150](https://github.com/chipkin/cas-bacnet-stack/issues/2150), [#2044](https://github.com/chipkin/cas-bacnet-stack/issues/2044) | Ask | Ask | Ask | Ask | Ask |
 
 ### Lighting controllers (Annex L.11)
 
@@ -543,7 +540,7 @@ Client-side profiles.
 | **B-EWS** Elevator Workstation | planned | — | — | — | — | — |
 | **B-AEWS** Advanced Elevator Workstation | planned | — | — | — | — | — |
 
-🚧 = in progress. ⛔ = Blocked Example (blocked on the named stack gap). "Ask" = not yet built for that language; contact Chipkin if you need it. Profile definitions: ANSI/ASHRAE 135-2024 Annex L. BIBB definitions: Annex K. Get the stack: <https://store.chipkin.com/services/stacks/bacnet-stack>.
+⛔ = Blocked Example (blocked on the named stack gap). "Ask" = not yet built for that language; contact Chipkin if you need it. Profile definitions: ANSI/ASHRAE 135-2024 Annex L. BIBB definitions: Annex K. Get the stack: <https://store.chipkin.com/services/stacks/bacnet-stack>.
 <!-- PROFILE-TABLE:END -->
 
 ## References

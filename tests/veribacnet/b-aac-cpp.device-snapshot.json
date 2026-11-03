@@ -22,7 +22,7 @@
     "vendorId": 389
   },
   "identity": {
-    "applicationSoftwareVersion": "1.5.0",
+    "applicationSoftwareVersion": "1.5.1",
     "firmwareRevision": "6.0.23.0",
     "modelName": "CAS BACnet Stack Example - B-AAC",
     "objectName": "Chipkin Example B-AAC",
@@ -833,7 +833,7 @@
           "status": "ok",
           "value": {
             "tag": "characterString",
-            "value": "1.5.0"
+            "value": "1.5.1"
           }
         },
         "databaseRevision": {

@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_No changes yet._
+## [1.5.1] - 2026-11-02
+
+Built on CAS BACnet Stack 6.x (`1e7dffe2b`).
+
+### Changed
+
+- **CAS BACnet Stack updated** to 6.x `1e7dffe2b` (still version 6.0.23).
+- **An I-Am also reaches a client on another UDP port.** At this stack
+  version, a broadcast the stack sends without a destination address, such as
+  the I-Am that answers a Who-Is, or an I-Have, is addressed by the example. It
+  still goes to the local subnet broadcast address, and is now also sent
+  unicast to the last client heard from a UDP port other than the example's own,
+  so a tool on the same computer on another port hears the answer. Only the
+  messages the stack addresses itself (network layer messages, I-Am, I-Have)
+  are copied, so an alarm sent as a broadcast UnconfirmedEventNotification is
+  not duplicated. Vendored `common/` updated to 3.6.1; see `common/CHANGELOG.md`.
+- **README and PICS**: the stack's own default for Number_Of_APDU_Retries is 3,
+  not 0, and the stack's fix for writing an empty `Recipient_List` is in this
+  pin, so it is no longer listed as a limitation (see TODO.md). The profile
+  example table is the same in every example; the blocked examples are marked
+  with their open stack issue.
+
+### Fixed
+
+- **VeriBACnet project** (`tests/veribacnet/`): the README now starts the
+  example with `--dcc-password`, which the project's password tests expect, and
+  the EPICS no longer fixes Analog Output 1's `Present_Value` and
+  `Priority_Array`, which the Schedule changes with the time of day.
 
 ## [1.5.0] - 2026-10-27
 
